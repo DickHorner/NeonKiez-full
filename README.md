@@ -156,3 +156,14 @@ Created by [Phaser Studio](mailto:support@phaser.io). Powered by coffee, anime, 
 The Phaser logo and characters are &copy; 2011 - 2025 Phaser Studio Inc.
 
 All rights reserved.
+
+## NeonKiez LDtk checks
+
+Run `node --test tests/ldtk-read.test.mjs` with Node 24 to test the Phaser-independent
+LDtk reader using the built-in test runner and TypeScript support. No additional
+test dependency is required. Run `./node_modules/.bin/tsc --noEmit` separately for
+type checking and `npm run build-nolog` for the production build.
+
+Later cleanup: review the unused `public/assets/ldtk/neonkiez` project file, which
+contains a different tileset path. The game loads `neonkiez-ldtk.ldtk`; the unused
+file remains unchanged in this extraction.

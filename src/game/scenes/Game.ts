@@ -6,59 +6,15 @@ import {
 } from 'phaser';
 
 
-type LdtkTile = {
-    px: [number, number];
-    src: [number, number];
-    f: number;
-};
-
-
-type LdtkField = {
-    __identifier: string;
-    __value: unknown;
-};
-
-type LdtkEntity = {
-    __identifier: string;
-    px: [number, number];
-    width: number;
-    height: number;
-    fieldInstances: LdtkField[];
-};
-
-
-type LdtkLayer = {
-    __identifier: string;
-
-    __gridSize: number;
-    __cWid: number;
-    __cHei: number;
-
-    pxOffsetX: number;
-    pxOffsetY: number;
-
-    intGridCsv: number[];
-
-    gridTiles: LdtkTile[];
-    autoLayerTiles: LdtkTile[];
-
-    entityInstances: LdtkEntity[];
-};
-
-
-type LdtkLevel = {
-    identifier: string;
-
-    pxWid: number;
-    pxHei: number;
-
-    layerInstances: LdtkLayer[];
-};
-
-
-type LdtkProject = {
-    levels: LdtkLevel[];
-};
+import {
+    readProject,
+    requireLevel,
+    requireLayer,
+    requireEntity,
+    findEntities,
+    type LdtkTile,
+    type LdtkLayer
+} from '../ldtk/read';
 
 
 type PhysicsRectangle =
@@ -99,38 +55,12 @@ export class Game extends Scene {
 
 
     create() {
-        const project =
-            this.cache.json.get('neonkiez') as LdtkProject;
+        const project = readProject(this.cache.json.get('neonkiez'));
+        const level = requireLevel(project, 'Hub_Test');
 
-        const level = project.levels.find(
-            level => level.identifier === 'Hub_Test'
-        );
-
-        if (!level) {
-            throw new Error(
-                'LDtk level "Hub_Test" not found'
-            );
-        }
-
-
-        const ground = level.layerInstances.find(
-            layer => layer.__identifier === 'Ground'
-        );
-
-        const collision = level.layerInstances.find(
-            layer => layer.__identifier === 'Collision'
-        );
-
-        const entities = level.layerInstances.find(
-            layer => layer.__identifier === 'Entities'
-        );
-
-
-        if (!ground || !collision || !entities) {
-            throw new Error(
-                'Required LDtk layer not found'
-            );
-        }
+        const ground = requireLayer(level, 'Ground');
+        const collision = requireLayer(level, 'Collision');
+        const entities = requireLayer(level, 'Entities');
 
 
         //
@@ -192,17 +122,7 @@ export class Game extends Scene {
         // PLAYER SPAWN
         //
 
-        const spawn = entities.entityInstances.find(
-            entity =>
-                entity.__identifier === 'Player_Spawn'
-        );
-
-
-        if (!spawn) {
-            throw new Error(
-                'LDtk entity "Player_Spawn" not found'
-            );
-        }
+        const spawn = requireEntity(entities, 'Player_Spawn');
 
 
         const player =
@@ -228,11 +148,7 @@ export class Game extends Scene {
         // DUNGEON ENTRANCES FROM LDtk
         //
 
-        const dungeonEntrances =
-            entities.entityInstances.filter(
-                entity =>
-                    entity.__identifier === 'DungeonEntrance'
-            );
+        const dungeonEntrances = findEntities(entities, 'DungeonEntrance');
 
         dungeonEntrances.forEach(entrance => {
             const dungeonField =
