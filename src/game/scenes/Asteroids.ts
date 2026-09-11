@@ -1,6 +1,11 @@
 import { GameObjects, Input, Math as PhaserMath, Physics, Scene } from 'phaser';
+import { createAttempt, loseLife, respawn, clearAttempt, type Attempt } from '../asteroids/attempt';
 
 const TUNING = {
+    lives: 3,
+    respawnDelay: 900,
+    respawnProtection: 1200,
+    respawnClearance: 35,
     turnSpeed: 220,
     thrust: 210,
     maxSpeed: 240,
@@ -34,7 +39,7 @@ export class Asteroids extends Scene {
     private asteroids!: Physics.Arcade.Group;
     private status!: GameObjects.Text;
     private keys!: Record<'A' | 'D' | 'W' | 'LEFT' | 'RIGHT' | 'UP' | 'SPACE', Input.Keyboard.Key>;
-    private phase: 'playing' | 'restarting' | 'cleared' | 'leaving' = 'playing';
+    private attempt!: Attempt;
     private nextShotAt = 0;
 
     constructor() {
@@ -42,8 +47,8 @@ export class Asteroids extends Scene {
     }
 
     create() {
-        // Scene instances are reused after both collisions and hub visits.
-        this.phase = 'playing';
+        // Only a new dungeon visit or explicit retry creates a fresh attempt.
+        this.attempt = createAttempt(TUNING.lives);
         this.nextShotAt = 0;
         this.physics.resume();
         this.physics.world.drawDebug = false;
@@ -55,7 +60,7 @@ export class Asteroids extends Scene {
         }
         this.keys = this.input.keyboard.addKeys('A,D,W,LEFT,RIGHT,UP,SPACE') as typeof this.keys;
         this.input.keyboard.once('keydown-ESC', () => {
-            this.phase = 'leaving';
+            this.attempt.phase = 'leaving';
             this.scene.start('Game');
         });
 
@@ -87,7 +92,7 @@ export class Asteroids extends Scene {
         this.physics.add.overlap(this.bullets, this.asteroids, (bulletObject, asteroidObject) => {
             const bullet = bulletObject as Bullet;
             const asteroid = asteroidObject as Asteroid;
-            if (this.phase !== 'playing' || !bullet.active || !asteroid.active) {
+            if (this.attempt.phase !== 'playing' || !bullet.active || !asteroid.active) {
                 return;
             }
             bullet.destroy();
@@ -98,12 +103,23 @@ export class Asteroids extends Scene {
             }
         });
         this.physics.add.overlap(this.ship, this.asteroids, () => {
-            if (this.phase !== 'playing') {
+            if (!loseLife(this.attempt, this.time.now, TUNING.respawnDelay)) {
                 return;
             }
-            this.phase = 'restarting';
-            this.physics.pause();
-            this.scene.restart();
+            this.ship.body.stop();
+            this.ship.body.enable = false;
+            this.ship.setActive(false).setVisible(false);
+            this.bullets.clear(true, true);
+            this.updateStatus();
+            if (this.attempt.phase === 'lost') {
+                this.showResult('GAME OVER', 'R — RETRY   /   ESC — HUB');
+                this.input.keyboard!.once('keydown-R', () => {
+                    if (this.attempt.phase === 'lost') {
+                        this.attempt.phase = 'leaving';
+                        this.scene.restart();
+                    }
+                });
+            }
         });
     }
 
@@ -170,28 +186,59 @@ export class Asteroids extends Scene {
     }
 
     private updateStatus() {
-        this.status.setText(`ASTEROIDS  /  ${this.asteroids.countActive()} LEFT`);
+        const waiting = this.attempt.phase === 'respawning' ? '  /  RESPAWNING' : '';
+        this.status.setText(`${this.asteroids.countActive()} ROCKS  /  ${this.attempt.lives} LIVES${waiting}`);
     }
 
     private clearDungeon() {
-        this.phase = 'cleared';
+        if (!clearAttempt(this.attempt)) {
+            return;
+        }
+        this.updateStatus();
+        this.showResult('CLEARED', 'ESC — RETURN TO HUB');
+    }
+
+    private showResult(title: string, hint: string) {
         this.physics.pause();
         this.bullets.clear(true, true);
         const { width, height } = this.scale;
         this.add.rectangle(width / 2, height / 2, width, 120, 0x000000)
             .setDepth(20);
-        this.add.text(width / 2, height / 2 - 14, 'CLEARED', {
+        this.add.text(width / 2, height / 2 - 14, title, {
             fontFamily: 'monospace', fontSize: 42, color: '#ffffff'
         }).setOrigin(0.5).setDepth(21);
-        this.add.text(width / 2, height / 2 + 30, 'ESC — RETURN TO HUB', {
+        this.add.text(width / 2, height / 2 + 30, hint, {
             fontFamily: 'monospace', fontSize: 16, color: '#ffffff'
         }).setOrigin(0.5).setDepth(21);
     }
 
     update(time: number) {
-        if (this.phase !== 'playing') {
+        if (this.attempt.phase !== 'playing' && this.attempt.phase !== 'respawning') {
             return;
         }
+        if (this.asteroids.countActive() === 0) {
+            this.clearDungeon();
+            return;
+        }
+        this.physics.world.wrap(this.asteroids, TUNING.wrapPadding);
+        if (this.attempt.phase === 'respawning') {
+            const x = this.scale.width / 2;
+            const y = this.scale.height / 2;
+            const safe = this.asteroids.getChildren().every(object => {
+                const asteroid = object as Asteroid;
+                const distance = TUNING.shipRadius + asteroid.body.radius + TUNING.respawnClearance;
+                return PhaserMath.Distance.Squared(x, y, asteroid.body.center.x, asteroid.body.center.y) > distance * distance;
+            });
+            if (respawn(this.attempt, time, safe, TUNING.respawnProtection)) {
+                this.ship.setRotation(0).setActive(true).setVisible(true);
+                this.ship.body.enable = true;
+                this.ship.body.reset(x, y);
+                this.nextShotAt = time;
+                this.updateStatus();
+            }
+            return;
+        }
+        this.ship.setAlpha(time < this.attempt.protectedUntil ? 0.45 : 1);
         const left = this.keys.A.isDown || this.keys.LEFT.isDown;
         const right = this.keys.D.isDown || this.keys.RIGHT.isDown;
         this.ship.body.setAngularVelocity((Number(right) - Number(left)) * TUNING.turnSpeed);
@@ -215,6 +262,5 @@ export class Asteroids extends Scene {
         }
         this.physics.world.wrap(this.ship, TUNING.wrapPadding);
         this.physics.world.wrap(this.bullets, TUNING.wrapPadding);
-        this.physics.world.wrap(this.asteroids, TUNING.wrapPadding);
     }
 }
