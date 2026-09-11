@@ -55,6 +55,9 @@ export class Game extends Scene {
 
 
     create() {
+        // Scene instances survive shutdown; reset the guard on every hub visit.
+        this.dungeonTriggered = false;
+
         const project = readProject(this.cache.json.get('neonkiez'));
         const level = requireLevel(project, 'Hub_Test');
 
@@ -193,20 +196,6 @@ export class Game extends Scene {
                     );
 
                     this.scene.start('Asteroids');
-
-                    this.add.text(
-                        16,
-                        16,
-                        `DUNGEON: ${dungeonId.toUpperCase()}`,
-                        {
-                            fontFamily: 'monospace',
-                            fontSize: 24,
-                            color: '#ffffff',
-                            backgroundColor: '#000000'
-                        }
-                    )
-                        .setScrollFactor(0)
-                        .setDepth(1000);
                 }
             );
         });
