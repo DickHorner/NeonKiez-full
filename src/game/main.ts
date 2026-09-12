@@ -1,6 +1,7 @@
 import { Game as MainGame } from './scenes/Game';
 import { AUTO, Game, Scale, Types } from 'phaser';
 import { Asteroids } from './scenes/Asteroids';
+import { createSession } from './session';
 
 const config: Types.Core.GameConfig = {
     type: AUTO,
@@ -25,16 +26,16 @@ const config: Types.Core.GameConfig = {
     scale: {
         mode: Scale.FIT,
         autoCenter: Scale.CENTER_BOTH
-    },
-
-    scene: [
-        MainGame,
-        Asteroids
-    ]
+    }
 };
 
 const StartGame = (parent: string) => {
-    return new Game({ ...config, parent });
+    const session = createSession();
+    return new Game({
+        ...config,
+        parent,
+        scene: [new MainGame(session), new Asteroids(session)]
+    });
 };
 
 export default StartGame;

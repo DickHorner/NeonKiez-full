@@ -15,6 +15,7 @@ import {
     type LdtkTile,
     type LdtkLayer
 } from '../ldtk/read';
+import { isDungeonCleared, type Session } from '../session';
 
 
 type PhysicsRectangle =
@@ -24,6 +25,7 @@ type PhysicsRectangle =
 
 
 export class Game extends Scene {
+    private readonly session: Session;
     private player!: PhysicsRectangle;
 
     private keys!: {
@@ -34,8 +36,13 @@ export class Game extends Scene {
     };
     private dungeonTriggered = false;
 
-    constructor() {
+    constructor(session: Session) {
         super('Game');
+        this.session = session;
+    }
+
+    isDungeonCleared(dungeonId: string): boolean {
+        return isDungeonCleared(this.session, dungeonId);
     }
 
 

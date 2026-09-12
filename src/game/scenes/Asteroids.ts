@@ -1,5 +1,6 @@
 import { GameObjects, Input, Math as PhaserMath, Physics, Scene } from 'phaser';
 import { createAttempt, loseLife, respawn, clearAttempt, type Attempt } from '../asteroids/attempt';
+import { markDungeonCleared, type Session } from '../session';
 
 const TUNING = {
     lives: 3,
@@ -34,6 +35,7 @@ type Ship = GameObjects.Polygon & { body: Physics.Arcade.Body };
 type Bullet = GameObjects.Arc & { body: Physics.Arcade.Body; expiresAt: number };
 
 export class Asteroids extends Scene {
+    private readonly session: Session;
     private ship!: Ship;
     private bullets!: Physics.Arcade.Group;
     private asteroids!: Physics.Arcade.Group;
@@ -42,8 +44,9 @@ export class Asteroids extends Scene {
     private attempt!: Attempt;
     private nextShotAt = 0;
 
-    constructor() {
+    constructor(session: Session) {
         super('Asteroids');
+        this.session = session;
     }
 
     create() {
@@ -191,9 +194,10 @@ export class Asteroids extends Scene {
     }
 
     private clearDungeon() {
-        if (!clearAttempt(this.attempt)) {
+        if (this.asteroids.countActive() !== 0 || !clearAttempt(this.attempt)) {
             return;
         }
+        markDungeonCleared(this.session, 'Asteroids');
         this.updateStatus();
         this.showResult('CLEARED', 'ESC — RETURN TO HUB');
     }
