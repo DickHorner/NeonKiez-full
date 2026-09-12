@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Folders
+
+/private media/
+
+# Licensed third-party source assets; local only
+/public/assets/vendor/limezu/
