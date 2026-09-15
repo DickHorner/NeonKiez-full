@@ -3,6 +3,7 @@ import { AUTO, Game, Scale, Types } from 'phaser';
 import { Asteroids } from './scenes/Asteroids';
 import { SchoolPongCourt } from './scenes/SchoolPongCourt';
 import { RooftopInvaders } from './scenes/RooftopInvaders';
+import { VideoStorePlatform } from './scenes/VideoStorePlatform';
 import { createSession } from './session';
 
 const config: Types.Core.GameConfig = {
@@ -37,15 +38,17 @@ const StartGame = (parent: string) => {
     const asteroids = new Asteroids(session);
     const court = new SchoolPongCourt(session);
     const rooftop = new RooftopInvaders(session);
+    const videoStore = new VideoStorePlatform(session);
     // Standalone entry while the LDtk hub artwork is being authored.
     const dungeon = new URLSearchParams(window.location.search).get('dungeon');
     return new Game({
         ...config,
         parent,
-        scene: dungeon === 'RooftopInvaders' ? [rooftop, hub, asteroids, court]
-            : dungeon === 'SchoolPongCourt' ? [court, hub, asteroids, rooftop]
-            : dungeon === 'Asteroids' ? [asteroids, hub, court, rooftop]
-            : [hub, asteroids, court, rooftop]
+        scene: dungeon === 'VideoStorePlatform' ? [videoStore, hub, asteroids, court, rooftop]
+            : dungeon === 'RooftopInvaders' ? [rooftop, hub, asteroids, court, videoStore]
+            : dungeon === 'SchoolPongCourt' ? [court, hub, asteroids, rooftop, videoStore]
+            : dungeon === 'Asteroids' ? [asteroids, hub, court, rooftop, videoStore]
+            : [hub, asteroids, court, rooftop, videoStore]
     });
 };
 
