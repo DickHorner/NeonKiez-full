@@ -26,6 +26,7 @@ dist-ssr
 # Folders
 
 /private media/
+/internal/
 
 # Licensed third-party source assets; local only
 /public/assets/vendor/limezu/

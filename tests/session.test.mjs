@@ -30,3 +30,15 @@ test('session state round-trips through JSON and remains queryable', () => {
     markDungeonCleared(restored, 'Asteroids');
     assert.deepEqual(restored.clearedDungeonIds, ['Asteroids']);
 });
+
+test('School Pong Court clear is independent from Asteroids and serializable', () => {
+    const session = createSession();
+    assert.equal(isDungeonCleared(session, 'SchoolPongCourt'), false);
+    markDungeonCleared(session, 'SchoolPongCourt');
+    markDungeonCleared(session, 'SchoolPongCourt');
+    assert.equal(isDungeonCleared(session, 'Asteroids'), false);
+    const restored = JSON.parse(JSON.stringify(session));
+    assert.equal(isDungeonCleared(restored, 'SchoolPongCourt'), true);
+    markDungeonCleared(restored, 'Asteroids');
+    assert.deepEqual(restored.clearedDungeonIds, ['SchoolPongCourt', 'Asteroids']);
+});

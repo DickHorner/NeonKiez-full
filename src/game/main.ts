@@ -1,6 +1,7 @@
 import { Game as MainGame } from './scenes/Game';
 import { AUTO, Game, Scale, Types } from 'phaser';
 import { Asteroids } from './scenes/Asteroids';
+import { SchoolPongCourt } from './scenes/SchoolPongCourt';
 import { createSession } from './session';
 
 const config: Types.Core.GameConfig = {
@@ -31,10 +32,15 @@ const config: Types.Core.GameConfig = {
 
 const StartGame = (parent: string) => {
     const session = createSession();
+    const hub = new MainGame(session);
+    const asteroids = new Asteroids(session);
+    const court = new SchoolPongCourt(session);
+    // Standalone entry while the LDtk hub artwork is being authored.
+    const startCourt = new URLSearchParams(window.location.search).get('dungeon') === 'SchoolPongCourt';
     return new Game({
         ...config,
         parent,
-        scene: [new MainGame(session), new Asteroids(session)]
+        scene: startCourt ? [court, hub, asteroids] : [hub, asteroids, court]
     });
 };
 

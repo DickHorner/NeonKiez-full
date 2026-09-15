@@ -1,4 +1,4 @@
-export type DungeonId = 'Asteroids';
+export type DungeonId = 'Asteroids' | 'SchoolPongCourt';
 
 export type Session = {
     clearedDungeonIds: DungeonId[];
