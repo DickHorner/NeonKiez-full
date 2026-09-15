@@ -2392,7 +2392,24 @@
 					"seed": 3873877,
 					"overrideTilesetUid": null,
 					"gridTiles": [],
-					"entityInstances": []
+					"entityInstances": [
+						{
+							"__identifier": "Player_Spawn",
+							"__grid": [60,73],
+							"__pivot": [0,0],
+							"__tags": [],
+							"__tile": null,
+							"__smartColor": "#FEE761",
+							"iid": "c8324530-96d0-11f1-a8ef-45ace7a3070f",
+							"width": 16,
+							"height": 16,
+							"defUid": 3,
+							"px": [960,1168],
+							"fieldInstances": [],
+							"__worldX": 512,
+							"__worldY": 160
+						}
+					]
 				},
 				{
 					"__identifier": "Collision",
