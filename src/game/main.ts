@@ -44,6 +44,7 @@ const StartGame = (parent: string) => {
         parent,
         scene: dungeon === 'RooftopInvaders' ? [rooftop, hub, asteroids, court]
             : dungeon === 'SchoolPongCourt' ? [court, hub, asteroids, rooftop]
+            : dungeon === 'Asteroids' ? [asteroids, hub, court, rooftop]
             : [hub, asteroids, court, rooftop]
     });
 };

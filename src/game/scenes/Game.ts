@@ -12,8 +12,12 @@ import {
     requireLayer,
     requireEntity,
     findEntities,
+    tileLayers,
+    requireTileset,
+    tilesetPath,
     type LdtkTile,
-    type LdtkLayer
+    type LdtkLayer,
+    type LdtkTileset
 } from '../ldtk/read';
 import { isDungeonCleared, type Session } from '../session';
 
@@ -47,28 +51,42 @@ export class Game extends Scene {
 
 
     preload() {
-        this.load.setPath('assets');
-
-        this.load.json(
-            'neonkiez',
-            'ldtk/neonkiez-ldtk.ldtk'
-        );
-
-        this.load.image(
-            'hub-tiles',
-            'tilesets/tilemap.png'
-        );
+        // Queue only the visible, non-empty hub layers' images after JSON loads.
+        this.load.setPath('assets/ldtk/');
+        const loadTilesets = () => {
+            const project = readProject(this.cache.json.get('neonkiez'));
+            const level = requireLevel(project, 'Kiez_Center');
+            requireEntity(requireLayer(level, 'Entities'), 'Player_Spawn');
+            const collision = requireLayer(level, 'Collision');
+            if (!Array.isArray(collision.intGridCsv) ||
+                collision.intGridCsv.length !== collision.__cWid * collision.__cHei) {
+                throw new Error('LDtk Collision layer has inconsistent intGridCsv dimensions');
+            }
+            const queued = new Set<number>();
+            for (const layer of tileLayers(level)) {
+                const tileset = requireTileset(project, layer.__tilesetDefUid);
+                const path = tilesetPath(tileset, layer);
+                if (!queued.has(tileset.uid) && !this.textures.exists(`ldtk-${tileset.uid}`)) {
+                    this.load.image(`ldtk-${tileset.uid}`, path);
+                    queued.add(tileset.uid);
+                }
+            }
+        };
+        if (this.cache.json.exists('neonkiez')) {
+            loadTilesets();
+        } else {
+            this.load.once('filecomplete-json-neonkiez', loadTilesets);
+            this.load.json('neonkiez', 'neonkiez-ldtk.ldtk');
+        }
     }
-
 
     create() {
         // Scene instances survive shutdown; reset the guard on every hub visit.
         this.dungeonTriggered = false;
 
         const project = readProject(this.cache.json.get('neonkiez'));
-        const level = requireLevel(project, 'Hub_Test');
+        const level = requireLevel(project, 'Kiez_Center');
 
-        const ground = requireLayer(level, 'Ground');
         const collision = requireLayer(level, 'Collision');
         const entities = requireLayer(level, 'Entities');
 
@@ -77,55 +95,35 @@ export class Game extends Scene {
         // RENDER LDtk TILES
         //
 
-        const texture =
-            this.textures.get('hub-tiles');
-
-
-        const drawTile = (
-            tile: LdtkTile,
-            layer: LdtkLayer
-        ) => {
-            const frameName =
-                `tile-${tile.src[0]}-${tile.src[1]}`;
-
-
-            if (!texture.has(frameName)) {
-                texture.add(
-                    frameName,
-                    0,
-                    tile.src[0],
-                    tile.src[1],
-                    16,
-                    16
-                );
+        const drawTile = (tile: LdtkTile, layer: LdtkLayer, tileset: LdtkTileset) => {
+            const textureKey = `ldtk-${tileset.uid}`;
+            if (!this.textures.exists(textureKey)) {
+                throw new Error(`LDtk tileset image failed to load: ${tilesetPath(tileset, layer)}`);
             }
-
-
-            const image = this.add.image(
-                tile.px[0] + layer.pxOffsetX,
-                tile.px[1] + layer.pxOffsetY,
-                'hub-tiles',
-                frameName
-            );
-
-
-            image.setOrigin(0);
-
-            image.setFlip(
-                (tile.f & 1) !== 0,
-                (tile.f & 2) !== 0
-            );
+            const texture = this.textures.get(textureKey);
+            const size = tileset.tileGridSize;
+            const frameName = `${tile.src[0]}-${tile.src[1]}-${size}`;
+            if (!texture.has(frameName)) {
+                const source = texture.getSourceImage();
+                if (tile.src[0] < 0 || tile.src[1] < 0 ||
+                    tile.src[0] + size > source.width || tile.src[1] + size > source.height) {
+                    throw new Error(`LDtk tile source outside tileset UID ${tileset.uid}: ${frameName}`);
+                }
+                // Exported src already includes tileset spacing and padding.
+                texture.add(frameName, 0, tile.src[0], tile.src[1], size, size);
+            }
+            this.add.image(tile.px[0] + layer.__pxTotalOffsetX,
+                tile.px[1] + layer.__pxTotalOffsetY, textureKey, frameName)
+                .setOrigin(0)
+                .setFlip((tile.f & 1) !== 0, (tile.f & 2) !== 0)
+                .setAlpha(layer.__opacity * (tile.a ?? 1))
+                .setDepth(level.layerInstances.length - 1 - level.layerInstances.indexOf(layer));
         };
-
-
-        ground.gridTiles.forEach(
-            tile => drawTile(tile, ground)
-        );
-
-
-        collision.autoLayerTiles.forEach(
-            tile => drawTile(tile, collision)
-        );
+        for (const layer of tileLayers(level)) {
+            const tileset = requireTileset(project, layer.__tilesetDefUid);
+            layer.autoLayerTiles.forEach(tile => drawTile(tile, layer, tileset));
+            layer.gridTiles.forEach(tile => drawTile(tile, layer, tileset));
+        }
 
 
         //
@@ -137,8 +135,8 @@ export class Game extends Scene {
 
         const player =
             this.add.rectangle(
-                spawn.px[0] + spawn.width / 2,
-                spawn.px[1] + spawn.height / 2,
+                spawn.px[0] + entities.__pxTotalOffsetX + spawn.width / 2,
+                spawn.px[1] + entities.__pxTotalOffsetY + spawn.height / 2,
 
                 14,
                 14,
@@ -153,6 +151,7 @@ export class Game extends Scene {
         );
 
         this.player = player;
+        player.setDepth(level.layerInstances.length - 1 - level.layerInstances.indexOf(entities));
 
         //
         // DUNGEON ENTRANCES FROM LDtk
@@ -237,12 +236,12 @@ export class Game extends Scene {
 
 
                 const x =
-                    collision.pxOffsetX +
+                    collision.__pxTotalOffsetX +
                     gridX * gridSize +
                     gridSize / 2;
 
                 const y =
-                    collision.pxOffsetY +
+                    collision.__pxTotalOffsetY +
                     gridY * gridSize +
                     gridSize / 2;
 
