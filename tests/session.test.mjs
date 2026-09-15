@@ -42,3 +42,13 @@ test('School Pong Court clear is independent from Asteroids and serializable', (
     markDungeonCleared(restored, 'Asteroids');
     assert.deepEqual(restored.clearedDungeonIds, ['SchoolPongCourt', 'Asteroids']);
 });
+
+test('Video Store clear is independent and stores the stable ID once', () => {
+    const session = createSession();
+    assert.equal(isDungeonCleared(session, 'VideoStorePlatform'), false);
+    markDungeonCleared(session, 'VideoStorePlatform');
+    markDungeonCleared(session, 'VideoStorePlatform');
+    assert.equal(isDungeonCleared(session, 'RooftopInvaders'), false);
+    assert.deepEqual(session.clearedDungeonIds, ['VideoStorePlatform']);
+    assert.deepEqual(JSON.parse(JSON.stringify(session)), session);
+});
