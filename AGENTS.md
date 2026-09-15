@@ -99,16 +99,16 @@ Do not couple gameplay rules to asset filenames.
 The current prototype can:
 
 - load `public/assets/ldtk/neonkiez-ldtk.ldtk`
-- render `Hub_Test`
-- render Ground tiles
-- render Collision auto-tiles
-- build collision from the Collision IntGrid
+- load `Kiez_Center` as the authored hub level
+- render visible non-empty LDtk tile/auto-layer output using each layer's referenced tileset
+- support mixed 16 px semantic layers and 32 px LimeZu visual layers
+- keep `Collision` semantic-only and build physics from its IntGrid
 - spawn the player from `Player_Spawn`
 - move the player using WASD
 - follow the player with the camera
-- read `DungeonEntrance`
-- read `DungeonID = Asteroids`
-- transition to the Asteroids Phaser Scene
+- run Asteroids, School Pong Court, and Rooftop Invaders as separate Phaser scenes sharing one Session
+
+`DungeonEntrance` remains an authored LDtk entity type, but `Kiez_Center` currently has no placed entrance instances. Do not invent hard-coded entrances in Phaser.
 
 Preserve these behaviors unless the task explicitly changes them.
 
