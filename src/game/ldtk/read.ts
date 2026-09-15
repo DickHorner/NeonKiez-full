@@ -122,6 +122,7 @@ export function requireEntity(layer: LdtkLayer, identifier: string): LdtkEntity 
 }
 
 // LDtk exports topmost first; Phaser draws bottommost first.
+// Collision is semantic-only: its IntGrid drives physics and must never become world art.
 export function tileLayers(level: LdtkLevel): LdtkLayer[] {
     if (!Array.isArray(level.layerInstances)) {
         throw new Error(`LDtk level "${level.identifier}" has no layerInstances array`);
@@ -140,8 +141,8 @@ export function tileLayers(level: LdtkLevel): LdtkLayer[] {
             throw new Error(`LDtk layer "${layer.__identifier}" has missing tile arrays`);
         }
     }
-    return level.layerInstances.filter(layer => layer.visible &&
-        (layer.gridTiles.length > 0 || layer.autoLayerTiles.length > 0)).reverse();
+    return level.layerInstances.filter(layer => layer.__identifier !== 'Collision' &&
+        layer.visible && (layer.gridTiles.length > 0 || layer.autoLayerTiles.length > 0)).reverse();
 }
 
 export function requireTileset(project: LdtkProject, uid: number | null): LdtkTileset {
