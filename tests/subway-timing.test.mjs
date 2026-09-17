@@ -86,7 +86,7 @@ test('door stage opens on good timing, closes on miss and requires both streak a
     assert.equal(attempt.doorsOpen, true);
     assert.equal(reachGoal(attempt), false);
 
-    assert.equal(tapBeat(attempt, attempt.beatOriginAt + 750).kind, 'miss');
+    assert.equal(tapBeat(attempt, attempt.beatOriginAt + 250).kind, 'miss');
     assert.equal(attempt.doorsOpen, false);
     assert.equal(attempt.streak, 0);
 
