@@ -239,7 +239,9 @@ export class RooftopInvaders extends Scene {
             || this.enemyBullets.countActive() >= TUNING.enemyProjectileCap) return;
         const enemies = (this.enemies.getChildren() as Enemy[]).filter(enemy => enemy.active);
         if (enemies.length === 0) return;
-        const shooter = enemies[Math.floor(now / TUNING.enemyShotInterval) % enemies.length];
+        const lowestY = Math.max(...enemies.map(enemy => enemy.y));
+        const shooters = enemies.filter(enemy => enemy.y === lowestY);
+        const shooter = shooters[Math.floor(now / TUNING.enemyShotInterval) % shooters.length];
         const bullet = this.add.circle(shooter.x, shooter.y + 13, 3, 0xffc766) as Bullet;
         this.enemyBullets.add(bullet);
         bullet.body.setCircle(3);
