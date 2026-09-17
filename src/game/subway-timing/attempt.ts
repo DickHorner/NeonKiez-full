@@ -6,7 +6,7 @@ export const MISS_LIMIT = 3;
 export const STAGES = [
     { name: 'BEAT TUTORIAL', streakTarget: 3, doorCount: 0, switchCount: 0, markerCount: 0 },
     { name: 'DOORS', streakTarget: 5, doorCount: 3, switchCount: 0, markerCount: 0 },
-    { name: 'SWITCH CHAIN', streakTarget: 8, doorCount: 0, switchCount: 6, markerCount: 0 },
+    { name: 'SWITCH CHAIN', streakTarget: 8, doorCount: 0, switchCount: 8, markerCount: 0 },
     { name: 'FINAL STREAK', streakTarget: 12, doorCount: 0, switchCount: 0, markerCount: 4 }
 ] as const;
 
@@ -22,7 +22,6 @@ export type Attempt = {
     misses: number;
     beatOriginAt: number;
     lastConsumedBeat: number;
-    lastSwitchBeat: number;
     doorsOpen: boolean;
     activatedSwitches: number[];
 };
@@ -33,7 +32,6 @@ function resetStageState(attempt: Attempt, now: number) {
     attempt.misses = 0;
     attempt.beatOriginAt = now + BEAT_INTERVAL_MS;
     attempt.lastConsumedBeat = -1;
-    attempt.lastSwitchBeat = -1;
     attempt.doorsOpen = false;
     attempt.activatedSwitches = [];
 }
@@ -46,7 +44,6 @@ export function createAttempt(now = 0): Attempt {
         misses: 0,
         beatOriginAt: 0,
         lastConsumedBeat: -1,
-        lastSwitchBeat: -1,
         doorsOpen: false,
         activatedSwitches: []
     };
@@ -64,32 +61,18 @@ export function beatDistanceMs(attempt: Attempt, now: number): number {
     return nearestBeat(attempt, now).distanceMs;
 }
 
-function completeStageIfReady(attempt: Attempt) {
-    const stage = STAGES[attempt.stage];
-    if (attempt.streak < stage.streakTarget) return;
-
-    if (attempt.stage === 1) return;
-    if (attempt.stage === 2 && attempt.activatedSwitches.length < stage.switchCount) return;
-
-    attempt.phase = attempt.stage === STAGES.length - 1 ? 'cleared' : 'stage-cleared';
+export function beatCountdownMs(attempt: Attempt, now: number): number {
+    if (now <= attempt.beatOriginAt) return attempt.beatOriginAt - now;
+    const elapsed = now - attempt.beatOriginAt;
+    const phase = elapsed % BEAT_INTERVAL_MS;
+    return phase === 0 ? 0 : BEAT_INTERVAL_MS - phase;
 }
 
-export function tapBeat(attempt: Attempt, now: number): TapResult {
-    if (attempt.phase !== 'playing') return { kind: 'ignored' };
-
-    const beat = nearestBeat(attempt, now);
-    if (beat.distanceMs <= GOOD_WINDOW_MS) {
-        if (beat.beatIndex === attempt.lastConsumedBeat) return { kind: 'ignored' };
-        attempt.lastConsumedBeat = beat.beatIndex;
-        attempt.streak++;
-        if (attempt.stage === 1) attempt.doorsOpen = true;
-        completeStageIfReady(attempt);
-        return { kind: 'good', beatIndex: beat.beatIndex };
-    }
-
+function registerMiss(attempt: Attempt): TapResult {
     attempt.misses++;
     attempt.streak = 0;
-    if (attempt.stage === 1) attempt.doorsOpen = false;
+    if (attempt.stage === 1 && !attempt.doorsOpen) attempt.doorsOpen = false;
+    if (attempt.stage === 2) attempt.activatedSwitches = [];
     if (attempt.misses >= MISS_LIMIT) {
         attempt.doorsOpen = false;
         attempt.phase = 'lost';
@@ -97,24 +80,51 @@ export function tapBeat(attempt: Attempt, now: number): TapResult {
     return { kind: 'miss' };
 }
 
-export function reachGoal(attempt: Attempt): boolean {
-    if (attempt.phase !== 'playing' || attempt.stage !== 1) return false;
-    if (!attempt.doorsOpen || attempt.streak < STAGES[1].streakTarget) return false;
-    attempt.phase = 'stage-cleared';
+function acceptStageProgress(attempt: Attempt, targetIndex: number | null): boolean {
+    const stage = STAGES[attempt.stage];
+
+    if (attempt.stage === 2) {
+        const expected = attempt.activatedSwitches.length;
+        if (targetIndex !== expected) return false;
+        attempt.activatedSwitches.push(expected);
+        attempt.streak = attempt.activatedSwitches.length;
+        if (attempt.streak >= stage.streakTarget) attempt.phase = 'stage-cleared';
+        return true;
+    }
+
+    if (attempt.stage === 3) {
+        const expected = attempt.streak % stage.markerCount;
+        if (targetIndex !== expected) return false;
+        attempt.streak++;
+        if (attempt.streak >= stage.streakTarget) attempt.phase = 'cleared';
+        return true;
+    }
+
+    attempt.streak++;
+    if (attempt.stage === 0 && attempt.streak >= stage.streakTarget) {
+        attempt.phase = 'stage-cleared';
+    } else if (attempt.stage === 1 && attempt.streak >= stage.streakTarget) {
+        attempt.doorsOpen = true;
+    }
     return true;
 }
 
-export function activateSwitch(attempt: Attempt, switchIndex: number, beatIndex: number): boolean {
-    if (attempt.phase !== 'playing' || attempt.stage !== 2) return false;
-    if (!Number.isInteger(switchIndex) || switchIndex < 0 || switchIndex >= STAGES[2].switchCount) {
-        return false;
-    }
-    if (switchIndex !== attempt.activatedSwitches.length) return false;
-    if (beatIndex !== attempt.lastConsumedBeat || beatIndex === attempt.lastSwitchBeat) return false;
+export function tapBeat(attempt: Attempt, now: number, targetIndex: number | null = null): TapResult {
+    if (attempt.phase !== 'playing') return { kind: 'ignored' };
+    if (attempt.stage === 1 && attempt.doorsOpen) return { kind: 'ignored' };
 
-    attempt.activatedSwitches.push(switchIndex);
-    attempt.lastSwitchBeat = beatIndex;
-    completeStageIfReady(attempt);
+    const beat = nearestBeat(attempt, now);
+    if (beat.distanceMs > GOOD_WINDOW_MS) return registerMiss(attempt);
+    if (beat.beatIndex === attempt.lastConsumedBeat) return { kind: 'ignored' };
+
+    attempt.lastConsumedBeat = beat.beatIndex;
+    if (!acceptStageProgress(attempt, targetIndex)) return registerMiss(attempt);
+    return { kind: 'good', beatIndex: beat.beatIndex };
+}
+
+export function reachGoal(attempt: Attempt): boolean {
+    if (attempt.phase !== 'playing' || attempt.stage !== 1 || !attempt.doorsOpen) return false;
+    attempt.phase = 'stage-cleared';
     return true;
 }
 
