@@ -109,8 +109,8 @@ export function activateSwitch(attempt: Attempt, switchIndex: number, beatIndex:
     if (!Number.isInteger(switchIndex) || switchIndex < 0 || switchIndex >= STAGES[2].switchCount) {
         return false;
     }
+    if (switchIndex !== attempt.activatedSwitches.length) return false;
     if (beatIndex !== attempt.lastConsumedBeat || beatIndex === attempt.lastSwitchBeat) return false;
-    if (attempt.activatedSwitches.includes(switchIndex)) return false;
 
     attempt.activatedSwitches.push(switchIndex);
     attempt.lastSwitchBeat = beatIndex;
