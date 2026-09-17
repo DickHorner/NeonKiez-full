@@ -1,7 +1,7 @@
 import { GameObjects, Input, Physics, Scene } from 'phaser';
 import {
-    BEAT_INTERVAL_MS, GOOD_WINDOW_MS, MISS_LIMIT, STAGES,
-    activateSwitch, advanceStage, beatDistanceMs, createAttempt, leaveAttempt,
+    BEAT_INTERVAL_MS, MISS_LIMIT, STAGES,
+    advanceStage, beatCountdownMs, beatDistanceMs, createAttempt, leaveAttempt,
     reachGoal, retryStage, tapBeat, type Attempt
 } from '../subway-timing/attempt';
 import { markDungeonCleared, type Session } from '../session';
@@ -14,12 +14,15 @@ const TUNING = {
     arenaBottomInset: 42,
     gateWidth: 18,
     switchRadius: 13,
-    switchRange: 38
+    switchRange: 36,
+    finalMarkerRange: 30,
+    beatFlashMs: 60
 };
 
 type Player = GameObjects.Rectangle & { body: Physics.Arcade.Body };
 type Gate = GameObjects.Rectangle & { body: Physics.Arcade.StaticBody };
 type SwitchMarker = GameObjects.Arc & { switchIndex: number };
+type BeatMarker = GameObjects.Arc & { markerIndex: number };
 
 export class SubwayTiming extends Scene {
     private readonly session: Session;
@@ -29,7 +32,7 @@ export class SubwayTiming extends Scene {
     private goals!: Physics.Arcade.StaticGroup;
     private switches: SwitchMarker[] = [];
     private switchLabels: GameObjects.Text[] = [];
-    private beatMarkers: GameObjects.Arc[] = [];
+    private beatMarkers: BeatMarker[] = [];
     private beatCue!: GameObjects.Arc;
     private status!: GameObjects.Text;
     private message!: GameObjects.Text;
@@ -167,15 +170,17 @@ export class SubwayTiming extends Scene {
             ).setStrokeStyle(2, 0x72f5cf));
             this.applyDoorState();
         } else if (this.attempt.stage === 2) {
-            this.player.body.reset(80, centerY);
             const positions = [
-                { x: 145, y: 140 },
-                { x: 265, y: 140 },
-                { x: 385, y: 140 },
-                { x: 505, y: 140 },
-                { x: 505, y: 255 },
-                { x: 325, y: 255 }
+                { x: 180, y: 145 },
+                { x: 240, y: 145 },
+                { x: 300, y: 145 },
+                { x: 360, y: 145 },
+                { x: 420, y: 145 },
+                { x: 420, y: 215 },
+                { x: 340, y: 215 },
+                { x: 260, y: 215 }
             ];
+            this.player.body.reset(145, 145);
             positions.forEach((position, switchIndex) => {
                 const marker = this.add.circle(
                     position.x,
@@ -192,12 +197,25 @@ export class SubwayTiming extends Scene {
             });
             this.refreshSwitches();
         } else if (this.attempt.stage === 3) {
-            this.player.body.reset(this.scale.width / 2, centerY);
-            for (let index = 0; index < STAGES[3].markerCount; index++) {
-                const x = this.scale.width / 2 + (index - 1.5) * 58;
-                this.beatMarkers.push(this.add.circle(x, 178, 13, 0x2f415f, 0.9)
-                    .setStrokeStyle(2, 0xb7c8e8));
-            }
+            const positions = [
+                { x: 288, y: 160 },
+                { x: 352, y: 160 },
+                { x: 352, y: 224 },
+                { x: 288, y: 224 }
+            ];
+            this.player.body.reset(288, 160);
+            positions.forEach((position, markerIndex) => {
+                const marker = this.add.circle(
+                    position.x,
+                    position.y,
+                    15,
+                    0x2f415f,
+                    0.9
+                ).setStrokeStyle(2, 0xb7c8e8) as BeatMarker;
+                marker.markerIndex = markerIndex;
+                this.beatMarkers.push(marker);
+            });
+            this.refreshBeatMarkers();
         } else {
             this.player.body.reset(this.scale.width / 2, centerY);
         }
@@ -221,37 +239,43 @@ export class SubwayTiming extends Scene {
         }
     }
 
+    private refreshBeatMarkers() {
+        if (this.beatMarkers.length === 0) return;
+        const expected = this.attempt.streak % this.beatMarkers.length;
+        this.beatMarkers.forEach((marker, index) => {
+            marker.setFillStyle(index === expected ? 0xffc766 : 0x2f415f, 0.9);
+        });
+    }
+
     private nearbySwitch(): SwitchMarker | undefined {
-        let nearest: SwitchMarker | undefined;
-        let nearestDistance = Infinity;
-        for (const marker of this.switches) {
-            if (this.attempt.activatedSwitches.includes(marker.switchIndex)) continue;
-            const distance = Math.hypot(this.player.x - marker.x, this.player.y - marker.y);
-            if (distance <= TUNING.switchRange && distance < nearestDistance) {
-                nearest = marker;
-                nearestDistance = distance;
-            }
-        }
-        return nearest;
+        const expected = this.attempt.activatedSwitches.length;
+        const marker = this.switches[expected];
+        if (!marker) return undefined;
+        return Math.hypot(this.player.x - marker.x, this.player.y - marker.y) <= TUNING.switchRange
+            ? marker : undefined;
+    }
+
+    private nearbyBeatMarker(): BeatMarker | undefined {
+        if (this.beatMarkers.length === 0) return undefined;
+        const marker = this.beatMarkers[this.attempt.streak % this.beatMarkers.length];
+        return Math.hypot(this.player.x - marker.x, this.player.y - marker.y) <= TUNING.finalMarkerRange
+            ? marker : undefined;
     }
 
     private handleTap(now: number) {
-        const result = tapBeat(this.attempt, now);
+        const targetIndex = this.attempt.stage === 2
+            ? this.nearbySwitch()?.switchIndex ?? null
+            : this.attempt.stage === 3
+                ? this.nearbyBeatMarker()?.markerIndex ?? null
+                : null;
+        const result = tapBeat(this.attempt, now, targetIndex);
         if (result.kind === 'ignored') return;
 
-        if (result.kind === 'good') {
-            this.feedback.setText('GOOD');
-            if (this.attempt.stage === 2) {
-                const marker = this.nearbySwitch();
-                if (marker && activateSwitch(this.attempt, marker.switchIndex, result.beatIndex)) {
-                    this.refreshSwitches();
-                }
-            }
-        } else {
-            this.feedback.setText('MISS');
-        }
-
+        this.feedback.setText(result.kind === 'good' ? 'GOOD' : 'MISS');
         if (this.attempt.stage === 1) this.applyDoorState();
+        if (this.attempt.stage === 2) this.refreshSwitches();
+        if (this.attempt.stage === 3) this.refreshBeatMarkers();
+
         if (this.attempt.phase === 'cleared') {
             markDungeonCleared(this.session, 'SubwayTiming');
         }
@@ -260,23 +284,25 @@ export class SubwayTiming extends Scene {
 
     private updateStatus() {
         const stage = STAGES[this.attempt.stage];
+        const progress = this.attempt.stage === 2
+            ? `CHAIN ${this.attempt.activatedSwitches.length}/${stage.switchCount}`
+            : `STREAK ${this.attempt.streak}/${stage.streakTarget}`;
         const extras = this.attempt.stage === 1
             ? ` · DOORS ${this.attempt.doorsOpen ? 'OPEN' : 'CLOSED'}`
-            : this.attempt.stage === 2
-                ? ` · SWITCHES ${this.attempt.activatedSwitches.length}/${stage.switchCount}`
+            : this.attempt.stage === 3
+                ? ` · FIELD ${(this.attempt.streak % stage.markerCount) + 1}/${stage.markerCount}`
                 : '';
         this.status.setText(
-            `SUBWAY TIMING · ${this.attempt.stage}/3 ${stage.name} · `
-            + `STREAK ${this.attempt.streak}/${stage.streakTarget} · MISSES ${this.attempt.misses}/${MISS_LIMIT}`
-            + extras
+            `SUBWAY TIMING · ${this.attempt.stage}/3 ${stage.name} · ${progress} · `
+            + `MISSES ${this.attempt.misses}/${MISS_LIMIT}${extras}`
         );
 
         this.message.setText(this.attempt.phase === 'cleared' ? 'SUBWAY CLEARED!\nESC — HUB'
             : this.attempt.phase === 'lost' ? 'TIMING LOST\nR — RETRY STAGE · ESC — HUB'
             : this.attempt.phase === 'stage-cleared' ? 'STAGE CLEARED\nENTER — NEXT STAGE'
-            : this.attempt.stage === 1 ? 'BUILD 5 STREAK · CROSS THE GATES'
-            : this.attempt.stage === 2 ? 'HIT THE NUMBERED SWITCHES ON BEAT'
-            : this.attempt.stage === 3 ? 'FINAL STREAK · 12 CLEAN BEATS'
+            : this.attempt.stage === 1 ? '5 CLEAN BEATS OPEN THE GATES'
+            : this.attempt.stage === 2 ? 'STAND ON 1 → 8 · HIT EACH ONE ON BEAT'
+            : this.attempt.stage === 3 ? 'STAND ON THE LIT FIELD · SPACE ON BEAT'
             : 'SPACE ON THE BEAT · 3 IN A ROW');
         this.message.setVisible(this.attempt.phase !== 'playing' || this.attempt.streak === 0);
 
@@ -284,23 +310,18 @@ export class SubwayTiming extends Scene {
     }
 
     private updateBeatCue(now: number) {
-        const distance = beatDistanceMs(this.attempt, now);
-        const closeness = 1 - Math.min(distance / (BEAT_INTERVAL_MS / 2), 1);
-        this.beatCue.setScale(0.7 + closeness * 0.75);
-        this.beatCue.setFillStyle(distance <= GOOD_WINDOW_MS ? 0x72f5cf : 0x52657b, 0.9);
-
-        if (this.attempt.stage === 3 && this.beatMarkers.length > 0) {
-            const beatIndex = Math.max(0,
-                Math.round((now - this.attempt.beatOriginAt) / BEAT_INTERVAL_MS));
-            const activeIndex = beatIndex % this.beatMarkers.length;
-            this.beatMarkers.forEach((marker, index) => {
-                marker.setFillStyle(index === activeIndex ? 0xffc766 : 0x2f415f, 0.9);
-            });
-        }
+        const countdown = beatCountdownMs(this.attempt, now);
+        const progress = 1 - Math.min(countdown / BEAT_INTERVAL_MS, 1);
+        this.beatCue.setScale(2 - progress * 1.35);
+        this.beatCue.setFillStyle(
+            beatDistanceMs(this.attempt, now) <= TUNING.beatFlashMs ? 0x72f5cf : 0x52657b,
+            0.9
+        );
     }
 
-    update(now: number) {
+    update() {
         if (this.attempt.phase === 'leaving') return;
+        const now = this.time.now;
         this.updateBeatCue(now);
 
         if (Input.Keyboard.JustDown(this.keys.R) && retryStage(this.attempt, now)) {
