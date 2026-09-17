@@ -1,25 +1,33 @@
-// Pocket's stage progression, tuned for the Full prototype's 640 × 360 court.
+export type CourtAxis = 'horizontal' | 'vertical';
+export type PointSide = 'player' | 'opponent';
+export type Direction = -1 | 1;
+
 export const STAGES = [
-    { name: 'PADDLE LEARN', targetCount: 3, columns: 3, ballSpeed: 160 },
-    { name: 'TARGETS', targetCount: 8, columns: 4, ballSpeed: 240 },
-    { name: 'REFLECTORS', targetCount: 6, columns: 3, ballSpeed: 240 },
-    { name: 'FINAL CLEAR', targetCount: 12, columns: 4, ballSpeed: 240 }
+    { name: 'RALLY', targetScore: 2, ballSpeed: 170, aiSpeed: 125, aiDeadZone: 34, axis: 'horizontal' as CourtAxis },
+    { name: 'MATCH', targetScore: 3, ballSpeed: 200, aiSpeed: 155, aiDeadZone: 28, axis: 'horizontal' as CourtAxis },
+    { name: 'FAST RALLY', targetScore: 4, ballSpeed: 225, aiSpeed: 180, aiDeadZone: 22, axis: 'horizontal' as CourtAxis },
+    { name: 'FINAL MATCH', targetScore: 5, ballSpeed: 250, aiSpeed: 205, aiDeadZone: 16, axis: 'vertical' as CourtAxis }
 ] as const;
 
 const MAX_BOUNCE_ANGLE = Math.PI / 3;
+const SERVE_OFF_AXIS_RATIO = 0.32;
 
 export type Attempt = {
     stage: number;
-    remainingTargets: number[];
-    phase: 'ready' | 'playing' | 'stage-cleared' | 'cleared' | 'leaving';
+    playerScore: number;
+    opponentScore: number;
+    serveToward: PointSide;
+    phase: 'ready' | 'playing' | 'stage-cleared' | 'lost' | 'cleared' | 'leaving';
 };
 
-function targetIds(stage: number): number[] {
-    return Array.from({ length: STAGES[stage].targetCount }, (_, id) => id);
-}
-
 export function createAttempt(): Attempt {
-    return { stage: 0, remainingTargets: targetIds(0), phase: 'ready' };
+    return {
+        stage: 0,
+        playerScore: 0,
+        opponentScore: 0,
+        serveToward: 'opponent',
+        phase: 'ready'
+    };
 }
 
 export function serveBall(attempt: Attempt): boolean {
@@ -28,32 +36,74 @@ export function serveBall(attempt: Attempt): boolean {
     return true;
 }
 
-export function missBall(attempt: Attempt): boolean {
+export function scorePoint(attempt: Attempt, side: PointSide): boolean {
     if (attempt.phase !== 'playing') return false;
-    attempt.phase = 'ready';
-    return true;
-}
 
-export function hitTarget(attempt: Attempt, id: number): boolean {
-    if (attempt.phase !== 'playing') return false;
-    const index = attempt.remainingTargets.indexOf(id);
-    if (index === -1) return false;
-    attempt.remainingTargets.splice(index, 1);
-    if (attempt.remainingTargets.length === 0) {
+    if (side === 'player') attempt.playerScore++;
+    else attempt.opponentScore++;
+
+    const targetScore = STAGES[attempt.stage].targetScore;
+    if (attempt.playerScore >= targetScore) {
         attempt.phase = attempt.stage === STAGES.length - 1 ? 'cleared' : 'stage-cleared';
+    } else if (attempt.opponentScore >= targetScore) {
+        attempt.phase = 'lost';
+    } else {
+        // The next serve travels toward the side that conceded the point.
+        // This avoids an alternating serve turning a won point into an immediate own goal.
+        attempt.serveToward = side === 'player' ? 'opponent' : 'player';
+        attempt.phase = 'ready';
     }
     return true;
 }
 
 export function advanceStage(attempt: Attempt): boolean {
-    if (attempt.phase !== 'stage-cleared') return false;
+    if (attempt.phase !== 'stage-cleared' || attempt.stage >= STAGES.length - 1) return false;
     attempt.stage++;
-    attempt.remainingTargets = targetIds(attempt.stage);
+    attempt.playerScore = 0;
+    attempt.opponentScore = 0;
+    attempt.serveToward = 'opponent';
     attempt.phase = 'ready';
     return true;
 }
 
-export function paddleBounce(offset: number, halfWidth: number, speed: number) {
-    const angle = Math.max(-1, Math.min(1, offset / halfWidth)) * MAX_BOUNCE_ANGLE;
-    return { x: Math.sin(angle) * speed, y: -Math.cos(angle) * speed };
+export function retryStage(attempt: Attempt): boolean {
+    if (attempt.phase !== 'lost') return false;
+    attempt.playerScore = 0;
+    attempt.opponentScore = 0;
+    attempt.serveToward = 'opponent';
+    attempt.phase = 'ready';
+    return true;
+}
+
+export function leaveAttempt(attempt: Attempt): boolean {
+    if (attempt.phase === 'leaving') return false;
+    attempt.phase = 'leaving';
+    return true;
+}
+
+export function paddleBounce(offset: number, halfLength: number, speed: number,
+    axis: CourtAxis, primaryDirection: Direction) {
+    const angle = Math.max(-1, Math.min(1, offset / halfLength)) * MAX_BOUNCE_ANGLE;
+    const primary = Math.cos(angle) * speed * primaryDirection;
+    const secondary = Math.sin(angle) * speed;
+    return axis === 'horizontal'
+        ? { x: primary, y: secondary }
+        : { x: secondary, y: primary };
+}
+
+export function serveVelocity(speed: number, axis: CourtAxis, primaryDirection: Direction,
+    secondaryDirection: Direction) {
+    const secondary = speed * SERVE_OFF_AXIS_RATIO * secondaryDirection;
+    const primary = Math.sqrt(speed * speed - secondary * secondary) * primaryDirection;
+    return axis === 'horizontal'
+        ? { x: primary, y: secondary }
+        : { x: secondary, y: primary };
+}
+
+export function aiVelocity(paddlePosition: number, ballPosition: number, centerPosition: number,
+    trackBall: boolean, speed: number, deadZone: number): number {
+    const target = trackBall ? ballPosition : centerPosition;
+    const delta = target - paddlePosition;
+    if (Math.abs(delta) <= deadZone) return 0;
+    return Math.sign(delta) * speed;
 }
