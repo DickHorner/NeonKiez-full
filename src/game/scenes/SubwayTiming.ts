@@ -28,6 +28,7 @@ export class SubwayTiming extends Scene {
     private gates!: Physics.Arcade.StaticGroup;
     private goals!: Physics.Arcade.StaticGroup;
     private switches: SwitchMarker[] = [];
+    private switchLabels: GameObjects.Text[] = [];
     private beatMarkers: GameObjects.Arc[] = [];
     private beatCue!: GameObjects.Arc;
     private status!: GameObjects.Text;
@@ -133,8 +134,10 @@ export class SubwayTiming extends Scene {
         this.gates.clear(true, true);
         this.goals.clear(true, true);
         for (const marker of this.switches) marker.destroy();
+        for (const label of this.switchLabels) label.destroy();
         for (const marker of this.beatMarkers) marker.destroy();
         this.switches = [];
+        this.switchLabels = [];
         this.beatMarkers = [];
         this.feedback.setText('');
 
@@ -183,9 +186,9 @@ export class SubwayTiming extends Scene {
                 ).setStrokeStyle(2, 0xb7c8e8) as SwitchMarker;
                 marker.switchIndex = switchIndex;
                 this.switches.push(marker);
-                this.add.text(position.x, position.y, String(switchIndex + 1), {
+                this.switchLabels.push(this.add.text(position.x, position.y, String(switchIndex + 1), {
                     fontFamily: 'monospace', fontSize: 11, color: '#ffffff'
-                }).setOrigin(0.5).setDepth(5);
+                }).setOrigin(0.5).setDepth(5));
             });
             this.refreshSwitches();
         } else if (this.attempt.stage === 3) {
