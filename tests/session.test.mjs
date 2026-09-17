@@ -52,3 +52,13 @@ test('Video Store clear is independent and stores the stable ID once', () => {
     assert.deepEqual(session.clearedDungeonIds, ['VideoStorePlatform']);
     assert.deepEqual(JSON.parse(JSON.stringify(session)), session);
 });
+
+test('Subway Timing clear is independent and stores the stable ID once', () => {
+    const session = createSession();
+    assert.equal(isDungeonCleared(session, 'SubwayTiming'), false);
+    markDungeonCleared(session, 'SubwayTiming');
+    markDungeonCleared(session, 'SubwayTiming');
+    assert.equal(isDungeonCleared(session, 'VideoStorePlatform'), false);
+    assert.deepEqual(session.clearedDungeonIds, ['SubwayTiming']);
+    assert.deepEqual(JSON.parse(JSON.stringify(session)), session);
+});
