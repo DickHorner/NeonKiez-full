@@ -3,13 +3,15 @@
 Run `npm run dev-nolog`, then open `http://localhost:8080/?dungeon=SchoolPongCourt`.
 The dedicated URL starts the court without requiring a hub entrance or touching artwork.
 
-- A/D or Left/Right: move the lower paddle.
-- Space: serve; after a match win, start the next stage.
-- R: retry the current stage after losing a match.
-- ESC: return to the hub.
-- The upper paddle is AI controlled.
+- Stages 0–2 use the familiar TV-style Pong layout: player paddle left, AI paddle right.
+- Stage 3 switches without advance warning to the original vertical orientation: player below, AI above.
+- WASD or arrow keys move along the active paddle axis.
+- Space serves; after a match win, Space starts the next stage.
+- R retries the current stage after losing a match.
+- ESC returns to the hub.
 - A point is scored when the opponent misses the ball.
 - Stages 0–3 are first to 2, 3, 4 and 5 points, with increasing ball and AI speed.
+- After a point, the next serve travels toward the side that conceded that point; serve direction does not simply alternate.
 - Only winning stage 3 records `SchoolPongCourt` in the shared session.
 - Scene re-entry starts stage 0 again while preserving any previous session clear.
 
@@ -27,8 +29,9 @@ from the Pocket target-clearing implementation:
 - two opposing paddles instead of bricks/targets;
 - player versus AI rallies;
 - score-based match progression;
-- open top/bottom scoring edges;
-- hit-position paddle rebounds on both sides.
+- hit-position paddle rebounds on both sides;
+- horizontal TV-style play for stages 0–2;
+- an unannounced vertical-orientation final match as the dungeon's mechanical twist.
 
 The four-stage dungeon structure and stable `SchoolPongCourt` session ID remain. The
 2/3/4/5 target scores, ball speeds and AI tuning are prototype tuning, not broader game
@@ -47,5 +50,6 @@ npm run build-nolog
 git -c core.whitespace=cr-at-eol diff --check
 ```
 
-Runtime smoke should cover serving, both paddle rebounds, player and AI scoring, stage
-win/advance, stage loss/retry, final session clear, ESC to hub and fresh re-entry.
+Runtime smoke should cover stages 0–2 with left/right paddles, the stage-3 orientation
+switch, serves after both player and AI points, both paddle rebounds, stage win/advance,
+stage loss/retry, final session clear, ESC to hub and fresh re-entry.
