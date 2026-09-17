@@ -20,32 +20,38 @@ Pocket Dungeon 4 is `DUN_SUBWAY_TIMING`, a 120 BPM rhythm/timing dungeon with a
 The current refactored Pocket files retain the basic beat timer and tap judgement, but
 most stage progression was stripped during the controller split. The recoverable source
 is the earlier Dungeon 4 implementation commit `b562bf8` plus `DUNGEON_04_TEST_PLAN.md`.
-Those sources define:
 
-1. `BEAT_TUTORIAL`: three-hit streak.
-2. `DOORS`: three rhythm gates; good hits open them, misses close them; five-hit streak
-   plus reaching the goal.
-3. `SWITCH_CHAIN`: six switches activated on-beat, with an eight-hit streak target.
-4. `FINAL_STREAK`: four beat markers and a twelve-hit streak.
+The first Full playtest exposed three problems in that recovered design: doors opened on
+the first successful hit instead of after the requested streak, Stage 2 separated its
+spatial targets from the eight-hit rhythm objective, and the final stage's four fields
+were decorative. Full now treats the playtest corrections as the active design for this
+slice:
 
-The old executable implementation had two inconsistencies: it allowed multiple good taps
-inside one beat window, and Stage 2 could complete from streak alone even if its switches
-were ignored. Full closes those loopholes: one beat can score once, and Stage 2 requires
-all six switches in numbered order as well as the eight-beat streak. This makes the
-source-described switch-chain mechanic materially necessary instead of decorative.
+1. `BEAT_TUTORIAL`: three clean beats.
+2. `DOORS`: three gates stay closed until a five-beat streak is complete, then latch open;
+   reaching the goal finishes the stage.
+3. `SWITCH_CHAIN`: eight numbered pads form one eight-beat chain. The player must stand on
+   the next pad and hit the beat; the eighth pad completes the stage with no extra beat.
+   A miss resets the chain.
+4. `FINAL_STREAK`: four lit fields form a loop. Each successful beat requires the player
+   to stand on the currently lit field. Twelve clean hits means three complete laps.
 
-Pocket automatically reloaded a stage after the third miss. Full uses the existing local
-retry convention (`R`) used by other fail-state dungeon slices, so the failure state is
-visible and deterministic before reset.
+One beat can score only once. Pocket's old repeated-tap loophole remains closed.
+Pocket automatically reloaded a stage after the third miss; Full keeps the visible `R`
+retry convention used by the other fail-state dungeon slices.
 
 ## Prototype presentation
 
-The slice uses primitive Phaser geometry only. A pulsing cue shows the 120 BPM timing
-window; there is no final music, sound design or authored subway art yet.
+The slice uses primitive Phaser geometry only. There is no final music, sound design or
+authored subway art yet.
+
+The rhythm cue and tap judgement now use the same Scene clock. The cue is a countdown:
+it contracts toward the center of the beat, flashes at the beat, then resets for the next
+500 ms cycle.
 
 - Stage 1 uses three physical gate bodies and a goal zone.
-- Stage 2 uses six numbered switch markers.
-- Stage 3 cycles four visual beat markers.
+- Stage 2 uses eight numbered on-beat pads.
+- Stage 3 uses four spatial beat fields that must actually be touched.
 - Only final Stage 3 completion records `SubwayTiming` in the shared Session.
 
 No Pocket rewards (`TOOL_FREEZECAM`, cassette), save system, LDtk dungeon map, hub door,
@@ -60,6 +66,7 @@ npm run build-nolog
 git -c core.whitespace=cr-at-eol diff --check
 ```
 
-Runtime smoke should cover good/miss timing, duplicate taps on one beat, three-miss retry,
-Stage 1 gate opening/closing plus goal, Stage 2 ordered switch activation, the 12-beat
-final streak, final session clear, ESC to hub and fresh re-entry.
+Runtime smoke should cover cue/beat synchronization, duplicate taps on one beat,
+three-miss retry, Stage 1 gates staying closed through hits 1-4 and opening on hit 5,
+Stage 2 pads 1-8 on consecutive beats, Stage 3 requiring the lit field for every hit,
+final session clear, ESC to hub and fresh re-entry.
