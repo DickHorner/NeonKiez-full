@@ -7,9 +7,29 @@ export const STAGES = [
     { name: 'CORE', enemiesPerWave: [0] }
 ] as const;
 export const ENEMY_CAP = 12;
-export const PROJECTILE_CAP = 20;
+// Classic Space Invaders timing: the player may only have one shot in flight.
+export const PROJECTILE_CAP = 1;
 export const PROJECTILE_LIFETIME = 2000;
 export const ALARM_INTERVAL = 5000;
+
+export type FormationDirection = -1 | 1;
+
+export type FormationMotion = {
+    dx: number;
+    dy: number;
+    direction: FormationDirection;
+};
+
+export function formationMotion(left: number, right: number, direction: FormationDirection,
+    distance: number, minX: number, maxX: number, drop: number): FormationMotion {
+    if (direction > 0 && right + distance >= maxX) {
+        return { dx: 0, dy: drop, direction: -1 };
+    }
+    if (direction < 0 && left - distance <= minX) {
+        return { dx: 0, dy: drop, direction: 1 };
+    }
+    return { dx: distance * direction, dy: 0, direction };
+}
 
 export type Attempt = {
     stage: number;
