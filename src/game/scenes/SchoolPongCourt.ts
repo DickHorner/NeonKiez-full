@@ -174,16 +174,18 @@ export class SchoolPongCourt extends Scene {
             this.court.lineBetween(TUNING.wallInset, centerY, this.courtRight, centerY);
         }
 
+        this.playerPaddle.setScale(1);
+        this.opponentPaddle.setScale(1);
         if (axis === 'horizontal') {
-            this.playerPaddle.setDisplaySize(TUNING.paddleThickness, TUNING.paddleLength);
-            this.opponentPaddle.setDisplaySize(TUNING.paddleThickness, TUNING.paddleLength);
+            this.playerPaddle.setSize(TUNING.paddleThickness, TUNING.paddleLength);
+            this.opponentPaddle.setSize(TUNING.paddleThickness, TUNING.paddleLength);
             this.playerPaddle.body.setSize(TUNING.paddleThickness, TUNING.paddleLength);
             this.opponentPaddle.body.setSize(TUNING.paddleThickness, TUNING.paddleLength);
             this.playerPaddle.body.reset(TUNING.wallInset + TUNING.playerInset, centerY);
             this.opponentPaddle.body.reset(this.courtRight - TUNING.opponentInset, centerY);
         } else {
-            this.playerPaddle.setDisplaySize(TUNING.paddleLength, TUNING.paddleThickness);
-            this.opponentPaddle.setDisplaySize(TUNING.paddleLength, TUNING.paddleThickness);
+            this.playerPaddle.setSize(TUNING.paddleLength, TUNING.paddleThickness);
+            this.opponentPaddle.setSize(TUNING.paddleLength, TUNING.paddleThickness);
             this.playerPaddle.body.setSize(TUNING.paddleLength, TUNING.paddleThickness);
             this.opponentPaddle.body.setSize(TUNING.paddleLength, TUNING.paddleThickness);
             this.playerPaddle.body.reset(centerX, this.courtBottom - TUNING.playerInset);
