@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-    STAGES, ENEMY_CAP, createAttempt, hitEnemy, advanceWave, advanceStage,
-    spawnAlarm, hitCore, hitPlayer, retryStage
+    STAGES, ENEMY_CAP, PROJECTILE_CAP, formationMotion, createAttempt, hitEnemy, advanceWave,
+    advanceStage, spawnAlarm, hitCore, hitPlayer, retryStage
 } from '../src/game/rooftop-invaders/attempt.ts';
 import { createSession, markDungeonCleared, isDungeonCleared } from '../src/game/session.ts';
 
@@ -29,6 +29,18 @@ test('fresh serializable attempt has three range enemies and exact wave counts',
     assert.deepEqual(JSON.parse(JSON.stringify(attempt)), attempt);
     hitEnemy(attempt, 0, 0);
     assert.equal(createAttempt().remainingEnemies.length, 3);
+});
+
+test('classic firing cap is one and formation scans, drops, then reverses at each edge', () => {
+    assert.equal(PROJECTILE_CAP, 1);
+    assert.deepEqual(formationMotion(100, 180, 1, 5, 20, 600, 18),
+        { dx: 5, dy: 0, direction: 1 });
+    assert.deepEqual(formationMotion(500, 598, 1, 5, 20, 600, 18),
+        { dx: 0, dy: 18, direction: -1 });
+    assert.deepEqual(formationMotion(22, 120, -1, 5, 20, 600, 18),
+        { dx: 0, dy: 18, direction: 1 });
+    assert.deepEqual(formationMotion(100, 180, -1, 5, 20, 600, 18),
+        { dx: -5, dy: 0, direction: -1 });
 });
 
 test('all eight normal waves are required; live waves and duplicate hits cannot advance', () => {
