@@ -5,6 +5,7 @@ import { SchoolPongCourt } from './scenes/SchoolPongCourt';
 import { RooftopInvaders } from './scenes/RooftopInvaders';
 import { VideoStorePlatform } from './scenes/VideoStorePlatform';
 import { SubwayTiming } from './scenes/SubwayTiming';
+import { LaundromatLabyrinth } from './scenes/LaundromatLabyrinth';
 import { createSession } from './session';
 
 const config: Types.Core.GameConfig = {
@@ -41,17 +42,19 @@ const StartGame = (parent: string) => {
     const rooftop = new RooftopInvaders(session);
     const videoStore = new VideoStorePlatform(session);
     const subway = new SubwayTiming(session);
+    const laundromat = new LaundromatLabyrinth(session);
     // Standalone entry while the LDtk hub artwork is being authored.
     const dungeon = new URLSearchParams(window.location.search).get('dungeon');
     return new Game({
         ...config,
         parent,
-        scene: dungeon === 'SubwayTiming' ? [subway, hub, asteroids, court, rooftop, videoStore]
-            : dungeon === 'VideoStorePlatform' ? [videoStore, hub, asteroids, court, rooftop, subway]
-            : dungeon === 'RooftopInvaders' ? [rooftop, hub, asteroids, court, videoStore, subway]
-            : dungeon === 'SchoolPongCourt' ? [court, hub, asteroids, rooftop, videoStore, subway]
-            : dungeon === 'Asteroids' ? [asteroids, hub, court, rooftop, videoStore, subway]
-            : [hub, asteroids, court, rooftop, videoStore, subway]
+        scene: dungeon === 'LaundromatLabyrinth' ? [laundromat, hub, asteroids, court, rooftop, videoStore, subway]
+            : dungeon === 'SubwayTiming' ? [subway, hub, asteroids, court, rooftop, videoStore, laundromat]
+            : dungeon === 'VideoStorePlatform' ? [videoStore, hub, asteroids, court, rooftop, subway, laundromat]
+            : dungeon === 'RooftopInvaders' ? [rooftop, hub, asteroids, court, videoStore, subway, laundromat]
+            : dungeon === 'SchoolPongCourt' ? [court, hub, asteroids, rooftop, videoStore, subway, laundromat]
+            : dungeon === 'Asteroids' ? [asteroids, hub, court, rooftop, videoStore, subway, laundromat]
+            : [hub, asteroids, court, rooftop, videoStore, subway, laundromat]
     });
 };
 
