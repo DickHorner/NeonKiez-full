@@ -73,3 +73,14 @@ test('Laundromat Labyrinth clear is independent and stores the stable ID once', 
     assert.deepEqual(session.clearedDungeonIds, ['LaundromatLabyrinth']);
     assert.deepEqual(JSON.parse(JSON.stringify(session)), session);
 });
+
+
+test('Warehouse Blockworks clear is independent and stores the stable ID once', () => {
+    const session = createSession();
+    assert.equal(isDungeonCleared(session, 'WarehouseBlockworks'), false);
+    markDungeonCleared(session, 'WarehouseBlockworks');
+    markDungeonCleared(session, 'WarehouseBlockworks');
+    assert.equal(isDungeonCleared(session, 'LaundromatLabyrinth'), false);
+    assert.deepEqual(session.clearedDungeonIds, ['WarehouseBlockworks']);
+    assert.deepEqual(JSON.parse(JSON.stringify(session)), session);
+});
