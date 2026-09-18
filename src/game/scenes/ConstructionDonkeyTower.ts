@@ -7,7 +7,7 @@ import { markDungeonCleared, type Session } from '../session';
 
 const TUNING = {
     playerSpeed: 175,
-    jumpVelocity: -315,
+    jumpVelocity: -255,
     gravity: 760,
     ladderSpeed: 120,
     playerWidth: 18,
@@ -16,7 +16,10 @@ const TUNING = {
     barrelRadius: 10,
     barrelSpeed: 95,
     arenaTop: 44,
-    arenaBottom: 318
+    arenaBottom: 318,
+    guardWidth: 8,
+    guardHeight: 48,
+    fallResetY: 390
 };
 
 type Player = GameObjects.Rectangle & { body: Physics.Arcade.Body };
@@ -36,6 +39,7 @@ export class ConstructionDonkeyTower extends Scene {
     private player!: Player;
     private platforms!: Physics.Arcade.StaticGroup;
     private goals!: Physics.Arcade.StaticGroup;
+    private playerGuards!: Physics.Arcade.StaticGroup;
     private barrels!: Physics.Arcade.Group;
     private ladders: Ladder[] = [];
     private stageDecor: GameObjects.GameObject[] = [];
@@ -73,7 +77,7 @@ export class ConstructionDonkeyTower extends Scene {
         this.input.keyboard.once('keydown-ESC', leave);
         this.events.once('shutdown', () => this.input.keyboard?.off('keydown-ESC', leave));
 
-        this.physics.world.setBounds(20, 34, this.scale.width - 40, 306, true, true, true, true);
+        this.physics.world.setBounds(20, 34, this.scale.width - 40, 360, true, true, true, false);
 
         this.player = this.add.rectangle(
             this.spawnX, this.spawnY,
@@ -85,6 +89,7 @@ export class ConstructionDonkeyTower extends Scene {
 
         this.platforms = this.physics.add.staticGroup();
         this.goals = this.physics.add.staticGroup();
+        this.playerGuards = this.physics.add.staticGroup();
         this.barrels = this.physics.add.group();
 
         this.physics.add.collider(
@@ -94,6 +99,7 @@ export class ConstructionDonkeyTower extends Scene {
             (_player, platform) => this.canPlayerLand(platform as Platform),
             this
         );
+        this.physics.add.collider(this.player, this.playerGuards);
         this.physics.add.collider(this.barrels, this.platforms);
         this.physics.add.overlap(this.player, this.goals, () => this.handleGoal());
         this.physics.add.overlap(this.player, this.barrels, (_player, object) => {
@@ -128,7 +134,14 @@ export class ConstructionDonkeyTower extends Scene {
         return object;
     }
 
-    private addPlatform(left: number, right: number, y: number, tierIndex: number) {
+    private addPlatform(
+        left: number,
+        right: number,
+        y: number,
+        tierIndex: number,
+        guardLeft = true,
+        guardRight = true
+    ) {
         const platform = this.add.rectangle(
             (left + right) / 2,
             y,
@@ -138,7 +151,20 @@ export class ConstructionDonkeyTower extends Scene {
         ).setStrokeStyle(2, 0xe08967) as Platform;
         platform.tierIndex = tierIndex;
         this.platforms.add(platform);
+        if (guardLeft) this.addPlayerGuard(left, y);
+        if (guardRight) this.addPlayerGuard(right, y);
         return platform;
+    }
+
+    private addPlayerGuard(x: number, platformY: number) {
+        this.playerGuards.add(this.add.rectangle(
+            x,
+            platformY - TUNING.guardHeight / 2 - TUNING.platformHeight / 2,
+            TUNING.guardWidth,
+            TUNING.guardHeight,
+            0xf3cc6b,
+            0.82
+        ).setStrokeStyle(1, 0xffffff));
     }
 
     private addLadder(x: number, upperY: number, lowerY: number) {
@@ -176,8 +202,8 @@ export class ConstructionDonkeyTower extends Scene {
         this.addPlatform(84, 596, this.tierYs[1], 1);
 
         if (trickGap) {
-            this.addPlatform(44, 286, this.tierYs[2], 2);
-            this.addPlatform(346, 556, this.tierYs[2], 2);
+            this.addPlatform(44, 286, this.tierYs[2], 2, true, false);
+            this.addPlatform(346, 556, this.tierYs[2], 2, false, true);
         } else {
             this.addPlatform(44, 556, this.tierYs[2], 2);
         }
@@ -197,6 +223,7 @@ export class ConstructionDonkeyTower extends Scene {
         this.physics.resume();
         this.platforms.clear(true, true);
         this.goals.clear(true, true);
+        this.playerGuards.clear(true, true);
         this.barrels.clear(true, true);
         for (const object of this.stageDecor) object.destroy();
         this.stageDecor = [];
@@ -311,6 +338,13 @@ export class ConstructionDonkeyTower extends Scene {
         }
     }
 
+    private resetAfterFall() {
+        this.onLadder = false;
+        this.player.body.reset(this.spawnX, this.spawnY);
+        this.player.body.setGravityY(TUNING.gravity).setVelocity(0, 0);
+        this.player.setAlpha(1);
+    }
+
     private handleBarrelHit(barrel: Barrel) {
         const now = this.time.now;
         if (!hitPlayer(this.attempt, now)) return;
@@ -366,6 +400,11 @@ export class ConstructionDonkeyTower extends Scene {
         if (this.attempt.phase !== 'playing') return;
 
         if (now >= this.attempt.protectedUntil) this.player.setAlpha(1);
+
+        if (this.player.y > TUNING.fallResetY) {
+            this.resetAfterFall();
+            return;
+        }
 
         if (now >= this.attempt.stunnedUntil) {
             this.updatePlayerMovement();
