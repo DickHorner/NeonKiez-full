@@ -28,7 +28,10 @@ This port uses primitive Phaser geometry but implements the actual interaction l
 - Ladders connect the tiers; gravity is disabled only while actively climbing.
 - Horizontal movement remains available on ladders.
 - Jumping is disabled while climbing.
-- Stage 2 splits a middle girder, so the route requires an actual jump between ladder sections.
+- Normal jump height is deliberately lower than the distance between floors, so ladders are required to change levels.
+- Player-only guard rails close the outer edge of every floor; barrels ignore them and can still drop to the next girder.
+- Stage 2 leaves only its internal broken-girder edges unguarded, so that one gap remains jumpable.
+- The physics world has no invisible bottom floor; a missed fall below the tower resets the player to the stage start.
 - Barrels spawn above the top tier, roll across each girder, fall at alternating edges, reverse direction on the next tier, and expire after 10 seconds.
 - Maximum active barrels: 4.
 - Barrel collision causes knockback/stun plus temporary i-frames, never damage.
@@ -45,4 +48,4 @@ npm run build-nolog
 git -c core.whitespace=cr-at-eol diff --check
 ```
 
-Runtime smoke should cover ladder entry/exit, no jump while climbing, normal grounded jump, Stage 2 gap traversal, barrel cap/expiry, barrel tier changes, harmless collision/i-frames, all four goals, final Session clear, ESC-to-hub, and fresh re-entry.
+Runtime smoke should cover ladder entry/exit, no jump while climbing, inability to jump directly to the next floor, blocked outer-edge falls, Stage 2 gap traversal, fall reset with no invisible floor, barrel cap/expiry, barrel tier changes, harmless collision/i-frames, all four goals, final Session clear, ESC-to-hub, and fresh re-entry.
