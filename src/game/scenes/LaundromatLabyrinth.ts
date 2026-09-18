@@ -197,13 +197,14 @@ export class LaundromatLabyrinth extends Scene {
             this.addGoal(586, 80);
         } else if (this.attempt.stage === 2) {
             this.player.body.reset(62, centerY);
-            [
+            const tokenPositions: Array<[string, number, number]> = [
                 ['token-1', 145, 105],
                 ['token-2', 265, 255],
                 ['token-3', 350, 120],
                 ['token-4', 455, 255],
                 ['token-5', 535, 110]
-            ].forEach(([id, x, y]) => this.addToken(id as string, x as number, y as number));
+            ];
+            tokenPositions.forEach(([id, x, y]) => this.addToken(id, x, y));
             this.addGoal(584, 276);
             this.spawnGhostBot();
         } else {
@@ -306,7 +307,7 @@ export class LaundromatLabyrinth extends Scene {
                         : this.attempt.stage === 2 && this.attempt.collectedTokenIds.length < TOKEN_TARGET
                             ? `COLLECT ${TOKEN_TARGET - this.attempt.collectedTokenIds.length} MORE TOKEN${TOKEN_TARGET - this.attempt.collectedTokenIds.length === 1 ? '' : 'S'}`
                             : this.attempt.stage === 3 && nearSwitch
-                                ? 'E — OPEN FINAL GATE'
+                                ? 'E — TOGGLE FINAL GATE'
                                 : '');
         this.message.setVisible(this.message.text.length > 0);
 
