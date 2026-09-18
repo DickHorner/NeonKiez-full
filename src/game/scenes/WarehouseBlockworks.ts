@@ -1,7 +1,7 @@
 import { GameObjects, Input, Physics, Scene } from 'phaser';
 import {
-    STAGES, activateSwitch, advanceStage, bumpCrate, createAttempt, leaveAttempt,
-    reachGoal, type Attempt
+    SOKOBAN_LAYOUTS, STAGES, advanceStage, bumpCrate, createAttempt, leaveAttempt,
+    moveSokoban, reachGoal, restartStage, type Attempt, type GridPoint, type SokobanLayout
 } from '../warehouse-blockworks/attempt';
 import { markDungeonCleared, type Session } from '../session';
 
@@ -11,27 +11,26 @@ const TUNING = {
     arenaInset: 22,
     arenaTop: 54,
     arenaBottomInset: 38,
-    switchRange: 42,
-    crateSize: 30
+    gridCell: 38,
+    movingCrateSize: 30
 };
 
 type Player = GameObjects.Rectangle & { body: Physics.Arcade.Body };
-type Gate = GameObjects.Rectangle & { body: Physics.Arcade.StaticBody };
-type SwitchMarker = GameObjects.Rectangle & { switchId: string };
 type MovingCrate = GameObjects.Rectangle & { body: Physics.Arcade.Body };
 
 export class WarehouseBlockworks extends Scene {
     private readonly session: Session;
     private attempt!: Attempt;
     private player!: Player;
-    private gates!: Physics.Arcade.StaticGroup;
     private goals!: Physics.Arcade.StaticGroup;
-    private crates!: Physics.Arcade.Group;
-    private switchMarkers: SwitchMarker[] = [];
+    private movingCrates!: Physics.Arcade.Group;
+    private sokobanCrates: GameObjects.Rectangle[] = [];
+    private sokobanGate?: GameObjects.Rectangle;
+    private stageDecor: GameObjects.GameObject[] = [];
     private status!: GameObjects.Text;
     private message!: GameObjects.Text;
     private keys!: Record<
-        'W' | 'A' | 'S' | 'D' | 'UP' | 'LEFT' | 'DOWN' | 'RIGHT' | 'E' | 'ENTER',
+        'W' | 'A' | 'S' | 'D' | 'UP' | 'LEFT' | 'DOWN' | 'RIGHT' | 'ENTER' | 'R',
         Input.Keyboard.Key
     >;
     private arenaBottom = 0;
@@ -49,7 +48,7 @@ export class WarehouseBlockworks extends Scene {
 
         if (!this.input.keyboard) throw new Error('Keyboard input unavailable');
         this.keys = this.input.keyboard.addKeys(
-            'W,A,S,D,UP,LEFT,DOWN,RIGHT,E,ENTER'
+            'W,A,S,D,UP,LEFT,DOWN,RIGHT,ENTER,R'
         ) as typeof this.keys;
 
         const leave = () => {
@@ -87,16 +86,18 @@ export class WarehouseBlockworks extends Scene {
         this.physics.add.existing(this.player);
         this.player.body.setCollideWorldBounds(true);
 
-        this.gates = this.physics.add.staticGroup();
         this.goals = this.physics.add.staticGroup();
-        this.crates = this.physics.add.group();
+        this.movingCrates = this.physics.add.group();
 
-        this.physics.add.collider(this.player, this.gates);
-        this.physics.add.overlap(this.player, this.goals, () => this.handleGoal());
-        this.physics.add.overlap(this.player, this.crates, (_player, object) => {
+        this.physics.add.overlap(this.player, this.goals, () => {
+            if (!reachGoal(this.attempt)) return;
+            this.player.body.stop();
+            this.updateStatus();
+        });
+        this.physics.add.overlap(this.player, this.movingCrates, (_player, object) => {
             const crate = object as MovingCrate;
             if (!crate.active) return;
-            this.handleCrateBump(crate);
+            this.handleMovingCrateBump(crate);
         });
 
         this.status = this.add.text(16, 10, '', {
@@ -110,7 +111,7 @@ export class WarehouseBlockworks extends Scene {
         this.add.text(
             width / 2,
             height - 13,
-            'WASD / ARROWS MOVE · E SWITCH · ENTER NEXT · ESC HUB',
+            'WASD / ARROWS MOVE · R RESET · ENTER NEXT · ESC HUB',
             {
                 fontFamily: 'monospace', fontSize: 11, color: '#c1b7a5',
                 backgroundColor: '#15120e', padding: { x: 4, y: 2 }
@@ -120,41 +121,148 @@ export class WarehouseBlockworks extends Scene {
         this.buildStage();
     }
 
-    private addConveyor(x: number, y: number, width: number) {
-        this.add.rectangle(x, y, width, 54, 0x373229).setStrokeStyle(2, 0x817766);
-        for (let offset = -width / 2 + 16; offset < width / 2; offset += 28) {
-            this.add.rectangle(x + offset, y, 10, 46, 0x5c5447, 0.8);
+    private track<T extends GameObjects.GameObject>(object: T): T {
+        this.stageDecor.push(object);
+        return object;
+    }
+
+    private cellToWorld(layout: SokobanLayout, point: GridPoint) {
+        const boardWidth = layout.width * TUNING.gridCell;
+        const boardHeight = layout.height * TUNING.gridCell;
+        const left = (this.scale.width - boardWidth) / 2;
+        const top = TUNING.arenaTop + (this.arenaBottom - TUNING.arenaTop - boardHeight) / 2;
+        return {
+            x: left + point.x * TUNING.gridCell + TUNING.gridCell / 2,
+            y: top + point.y * TUNING.gridCell + TUNING.gridCell / 2
+        };
+    }
+
+    private sameCell(a: GridPoint, b: GridPoint) {
+        return a.x === b.x && a.y === b.y;
+    }
+
+    private buildSokobanStage(layout: SokobanLayout) {
+        if (!this.attempt.sokoban) throw new Error('Sokoban state missing');
+
+        const boardWidth = layout.width * TUNING.gridCell;
+        const boardHeight = layout.height * TUNING.gridCell;
+        const left = (this.scale.width - boardWidth) / 2;
+        const top = TUNING.arenaTop + (this.arenaBottom - TUNING.arenaTop - boardHeight) / 2;
+
+        this.track(this.add.rectangle(
+            left + boardWidth / 2,
+            top + boardHeight / 2,
+            boardWidth,
+            boardHeight,
+            0x201d18,
+            0.9
+        ).setStrokeStyle(2, 0x887d6b));
+
+        for (let x = 1; x < layout.width - 1; x++) {
+            for (let y = 1; y < layout.height - 1; y++) {
+                const world = this.cellToWorld(layout, { x, y });
+                this.track(this.add.rectangle(
+                    world.x, world.y,
+                    TUNING.gridCell - 2,
+                    TUNING.gridCell - 2,
+                    0x2a261f,
+                    0.42
+                ));
+            }
         }
+
+        for (const cell of layout.conveyor) {
+            const world = this.cellToWorld(layout, cell);
+            this.track(this.add.rectangle(
+                world.x, world.y,
+                TUNING.gridCell - 5,
+                TUNING.gridCell - 8,
+                0x494136,
+                0.95
+            ).setStrokeStyle(1, 0x7d715e));
+            this.track(this.add.rectangle(world.x, world.y, 10, TUNING.gridCell - 12, 0x6b604f));
+        }
+
+        for (const wall of layout.walls) {
+            const world = this.cellToWorld(layout, wall);
+            this.track(this.add.rectangle(
+                world.x, world.y,
+                TUNING.gridCell - 2,
+                TUNING.gridCell - 2,
+                0x5d5549
+            ).setStrokeStyle(1, 0x918675));
+        }
+
+        for (const target of layout.targets) {
+            const world = this.cellToWorld(layout, target);
+            this.track(this.add.rectangle(
+                world.x, world.y,
+                TUNING.gridCell - 12,
+                TUNING.gridCell - 12,
+                0x72f5cf,
+                0.18
+            ).setStrokeStyle(2, 0x72f5cf));
+        }
+
+        const gateWorld = this.cellToWorld(layout, layout.gate);
+        this.sokobanGate = this.track(this.add.rectangle(
+            gateWorld.x,
+            gateWorld.y,
+            TUNING.gridCell - 4,
+            TUNING.gridCell - 4,
+            0xe4a74f,
+            0.9
+        ).setStrokeStyle(2, 0xffffff));
+
+        const goalWorld = this.cellToWorld(layout, layout.goal);
+        this.track(this.add.rectangle(
+            goalWorld.x,
+            goalWorld.y,
+            TUNING.gridCell - 10,
+            TUNING.gridCell - 10,
+            0x72f5cf,
+            0.2
+        ).setStrokeStyle(2, 0x72f5cf));
+
+        this.sokobanCrates = this.attempt.sokoban.crates.map(() =>
+            this.track(this.add.rectangle(
+                0, 0,
+                TUNING.gridCell - 8,
+                TUNING.gridCell - 8,
+                0xa97943
+            ).setStrokeStyle(2, 0xf0c88b).setDepth(6))
+        );
+
+        this.renderSokobanState();
     }
 
-    private addGate(x: number, y: number, width: number, height: number) {
-        this.gates.add(this.add.rectangle(x, y, width, height, 0xe4a74f, 0.88)
-            .setStrokeStyle(2, 0xffffff) as Gate);
-    }
+    private renderSokobanState() {
+        const state = this.attempt.sokoban;
+        const layout = SOKOBAN_LAYOUTS[this.attempt.stage];
+        if (!state || !layout) return;
 
-    private addGoal(x: number, y: number) {
-        this.goals.add(this.add.rectangle(x, y, 30, 46, 0x72f5cf, 0.18)
-            .setStrokeStyle(2, 0x72f5cf));
-    }
+        const playerWorld = this.cellToWorld(layout, state.player);
+        this.player.setPosition(playerWorld.x, playerWorld.y);
 
-    private addSwitch(switchId: string, x: number, y: number) {
-        const marker = this.add.rectangle(x, y, 26, 20, 0x669cff)
-            .setStrokeStyle(2, 0xffffff)
-            .setDepth(10) as SwitchMarker;
-        marker.switchId = switchId;
-        this.switchMarkers.push(marker);
-    }
+        state.crates.forEach((crate, index) => {
+            const world = this.cellToWorld(layout, crate);
+            const onTarget = layout.targets.some(target => this.sameCell(target, crate));
+            this.sokobanCrates[index]
+                .setPosition(world.x, world.y)
+                .setFillStyle(onTarget ? 0x72b98d : 0xa97943);
+        });
 
-    private addStaticCrate(x: number, y: number) {
-        this.add.rectangle(x, y, TUNING.crateSize, TUNING.crateSize, 0x926d43)
-            .setStrokeStyle(2, 0xd6b17c);
+        this.sokobanGate?.setVisible(!this.attempt.gatesOpen);
     }
 
     private addMovingCrate(x: number, y: number, vx: number, vy: number) {
         const crate = this.add.rectangle(
-            x, y, TUNING.crateSize, TUNING.crateSize, 0xb77a44
+            x, y,
+            TUNING.movingCrateSize,
+            TUNING.movingCrateSize,
+            0xb77a44
         ).setStrokeStyle(2, 0xf4c987) as MovingCrate;
-        this.crates.add(crate);
+        this.movingCrates.add(crate);
         crate.body
             .setAllowGravity(false)
             .setCollideWorldBounds(true)
@@ -164,91 +272,37 @@ export class WarehouseBlockworks extends Scene {
 
     private buildStage() {
         this.physics.resume();
-        this.gates.clear(true, true);
         this.goals.clear(true, true);
-        this.crates.clear(true, true);
-        for (const marker of this.switchMarkers) marker.destroy();
-        this.switchMarkers = [];
+        this.movingCrates.clear(true, true);
+        for (const object of this.stageDecor) object.destroy();
+        this.stageDecor = [];
+        this.sokobanCrates = [];
+        this.sokobanGate = undefined;
 
-        const centerY = (TUNING.arenaTop + this.arenaBottom) / 2;
         this.player.body.setVelocity(0, 0);
         this.player.setAlpha(1);
 
-        if (this.attempt.stage === 0) {
+        const layout = SOKOBAN_LAYOUTS[this.attempt.stage];
+        if (layout) {
+            this.player.body.enable = false;
+            this.buildSokobanStage(layout);
+        } else {
+            const centerY = (TUNING.arenaTop + this.arenaBottom) / 2;
+            this.player.body.enable = true;
             this.player.body.reset(58, centerY);
-            this.addConveyor(240, centerY, 260);
-            this.addStaticCrate(230, centerY);
-            this.addSwitch('intro-switch', 145, centerY - 72);
-            this.addGate(390, centerY, 28, this.arenaBottom - TUNING.arenaTop);
-            this.addGoal(578, centerY);
-        } else if (this.attempt.stage === 1) {
-            this.player.body.reset(58, centerY);
-            this.addStaticCrate(230, centerY - 56);
-            this.addStaticCrate(230, centerY + 56);
-            this.addStaticCrate(310, centerY - 56);
-            this.addStaticCrate(310, centerY + 56);
-            this.addSwitch('row-a', 145, centerY - 72);
-            this.addSwitch('row-b', 145, centerY + 72);
-            this.addGate(390, centerY, 28, this.arenaBottom - TUNING.arenaTop);
-            this.addGoal(578, centerY);
-        } else if (this.attempt.stage === 2) {
-            this.player.body.reset(58, centerY);
+            this.player.body.setCollideWorldBounds(true);
             this.addMovingCrate(190, 110, 78, 48);
             this.addMovingCrate(345, 185, -66, 58);
             this.addMovingCrate(475, 255, 54, -82);
-            this.addGoal(584, centerY);
-        } else {
-            this.player.body.reset(58, centerY);
-            this.addStaticCrate(225, centerY - 52);
-            this.addStaticCrate(225, centerY);
-            this.addStaticCrate(225, centerY + 52);
-            this.addSwitch('final-switch', 305, centerY);
-            this.addGate(405, centerY, 30, this.arenaBottom - TUNING.arenaTop);
-            this.addGoal(578, centerY);
+            this.goals.add(this.track(this.add.rectangle(
+                584, centerY, 30, 46, 0x72f5cf, 0.18
+            ).setStrokeStyle(2, 0x72f5cf)));
         }
 
-        this.applyGateState();
-        this.refreshSwitches();
         this.updateStatus();
     }
 
-    private applyGateState() {
-        for (const gate of this.gates.getChildren() as Gate[]) {
-            gate.setVisible(!this.attempt.gatesOpen);
-            gate.body.enable = !this.attempt.gatesOpen;
-        }
-    }
-
-    private refreshSwitches() {
-        for (const marker of this.switchMarkers) {
-            const active = this.attempt.activatedSwitchIds.includes(marker.switchId);
-            marker.setFillStyle(active ? 0x72f5cf : 0x669cff);
-        }
-    }
-
-    private nearestSwitch(): SwitchMarker | undefined {
-        let nearest: SwitchMarker | undefined;
-        let nearestDistance = Infinity;
-        for (const marker of this.switchMarkers) {
-            if (this.attempt.activatedSwitchIds.includes(marker.switchId)) continue;
-            const distance = Math.hypot(this.player.x - marker.x, this.player.y - marker.y);
-            if (distance <= TUNING.switchRange && distance < nearestDistance) {
-                nearest = marker;
-                nearestDistance = distance;
-            }
-        }
-        return nearest;
-    }
-
-    private useSwitch() {
-        const marker = this.nearestSwitch();
-        if (!marker || !activateSwitch(this.attempt, marker.switchId)) return;
-        this.refreshSwitches();
-        this.applyGateState();
-        this.updateStatus();
-    }
-
-    private handleCrateBump(crate: MovingCrate) {
+    private handleMovingCrateBump(crate: MovingCrate) {
         const now = this.time.now;
         if (!bumpCrate(this.attempt, now)) return;
 
@@ -259,13 +313,11 @@ export class WarehouseBlockworks extends Scene {
         this.player.setAlpha(0.55);
     }
 
-    private handleGoal() {
-        if (!reachGoal(this.attempt)) {
-            this.updateStatus();
-            return;
-        }
+    private handleSokobanMove(dx: number, dy: number) {
+        const result = moveSokoban(this.attempt, dx, dy);
+        if (result === 'blocked') return;
 
-        this.player.body.stop();
+        this.renderSokobanState();
         if (this.attempt.phase === 'cleared') {
             markDungeonCleared(this.session, 'WarehouseBlockworks');
         }
@@ -274,39 +326,67 @@ export class WarehouseBlockworks extends Scene {
 
     private updateStatus() {
         const stage = STAGES[this.attempt.stage];
-        const progress = stage.switchesRequired > 0
-            ? ` · SWITCHES ${this.attempt.activatedSwitchIds.length}/${stage.switchesRequired}`
-            : ' · MOVING CRATES';
+        const layout = SOKOBAN_LAYOUTS[this.attempt.stage];
+        let progress = ' · MOVING CRATES';
+
+        if (layout && this.attempt.sokoban) {
+            const placed = layout.targets.filter(target =>
+                this.attempt.sokoban?.crates.some(crate => this.sameCell(crate, target))
+            ).length;
+            progress = ` · CRATES ${placed}/${stage.crateTargetCount}`;
+        }
 
         this.status.setText(
             `WAREHOUSE BLOCKWORKS · ${this.attempt.stage}/3 ${stage.name}${progress}`
         );
 
-        const nearSwitch = this.nearestSwitch();
         this.message.setText(this.attempt.phase === 'cleared'
             ? 'WAREHOUSE CLEARED!\nESC — HUB'
             : this.attempt.phase === 'stage-cleared'
                 ? 'STAGE CLEARED\nENTER — NEXT STAGE'
-                : nearSwitch
-                    ? 'E — ACTIVATE SWITCH'
-                    : this.attempt.stage === 1 && !this.attempt.gatesOpen
-                        ? 'ACTIVATE BOTH SWITCHES'
-                        : this.attempt.stage === 2
-                            ? 'REACH THE EXIT · CRATES ONLY BUMP'
-                            : '');
+                : layout && this.attempt.gatesOpen
+                    ? 'EXIT OPEN · REACH THE GOAL'
+                    : this.attempt.stage === 0
+                        ? 'PUSH THE CRATE ONTO THE PAD'
+                        : this.attempt.stage === 1
+                            ? 'PUSH BOTH CRATES ONTO THE PADS'
+                            : this.attempt.stage === 3
+                                ? 'BUILD THE 3-CRATE PATTERN'
+                                : 'REACH THE EXIT · MOVING CRATES ONLY BUMP');
         this.message.setVisible(this.message.text.length > 0);
 
         if (this.attempt.phase !== 'playing') this.physics.pause();
     }
 
+    private handleGridInput() {
+        if (Input.Keyboard.JustDown(this.keys.W) || Input.Keyboard.JustDown(this.keys.UP)) {
+            this.handleSokobanMove(0, -1);
+        } else if (Input.Keyboard.JustDown(this.keys.S) || Input.Keyboard.JustDown(this.keys.DOWN)) {
+            this.handleSokobanMove(0, 1);
+        } else if (Input.Keyboard.JustDown(this.keys.A) || Input.Keyboard.JustDown(this.keys.LEFT)) {
+            this.handleSokobanMove(-1, 0);
+        } else if (Input.Keyboard.JustDown(this.keys.D) || Input.Keyboard.JustDown(this.keys.RIGHT)) {
+            this.handleSokobanMove(1, 0);
+        }
+    }
+
     update() {
         if (this.attempt.phase === 'leaving') return;
 
+        if (Input.Keyboard.JustDown(this.keys.R) && restartStage(this.attempt)) {
+            this.buildStage();
+            return;
+        }
         if (Input.Keyboard.JustDown(this.keys.ENTER) && advanceStage(this.attempt)) {
             this.buildStage();
             return;
         }
         if (this.attempt.phase !== 'playing') return;
+
+        if (this.attempt.sokoban) {
+            this.handleGridInput();
+            return;
+        }
 
         const now = this.time.now;
         if (now >= this.attempt.protectedUntil) this.player.setAlpha(1);
@@ -324,8 +404,5 @@ export class WarehouseBlockworks extends Scene {
                 (left || right || up || down) ? TUNING.playerSpeed : 0
             );
         }
-
-        if (Input.Keyboard.JustDown(this.keys.E)) this.useSwitch();
-        if (this.attempt.stage !== 2) this.updateStatus();
     }
 }
