@@ -1,4 +1,4 @@
-export type DungeonId = 'Asteroids' | 'SchoolPongCourt' | 'RooftopInvaders' | 'VideoStorePlatform' | 'SubwayTiming' | 'LaundromatLabyrinth';
+export type DungeonId = 'Asteroids' | 'SchoolPongCourt' | 'RooftopInvaders' | 'VideoStorePlatform' | 'SubwayTiming' | 'LaundromatLabyrinth' | 'WarehouseBlockworks';
 
 export type Session = {
     clearedDungeonIds: DungeonId[];
