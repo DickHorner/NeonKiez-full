@@ -350,7 +350,7 @@ export class ConstructionDonkeyTower extends Scene {
         if (!hitPlayer(this.attempt, now)) return;
 
         const direction = this.player.x < barrel.x ? -1 : 1;
-        this.player.body.setVelocity(direction * 190, -175);
+        this.player.body.setVelocityX(direction * 190);
         this.player.setAlpha(0.55);
         this.updateStatus();
     }
