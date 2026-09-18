@@ -1,6 +1,6 @@
 import { GameObjects, Input, Physics, Scene } from 'phaser';
 import {
-    GHOST_STUN_MS, STAGES, TOKEN_TARGET,
+    STAGES, TOKEN_TARGET,
     advanceStage, bumpGhost, collectToken, createAttempt, interactSwitch, leaveAttempt,
     reachGoal, type Attempt
 } from '../laundromat-labyrinth/attempt';
