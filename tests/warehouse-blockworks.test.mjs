@@ -54,7 +54,7 @@ function solveStage3(attempt) {
     move(attempt, 1, 0, 2);
     move(attempt, 0, -1);
     move(attempt, 1, 0, 2);
-    return move(attempt, 1, 0, 3);
+    return move(attempt, 1, 0);
 }
 
 function reachStage(targetStage) {
