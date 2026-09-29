@@ -55,7 +55,7 @@ const StartGame = (parent: string) => {
         ...config,
         parent,
         scene: dungeon === 'KitaKiez' ? [kita, hub, asteroids, court, rooftop, videoStore, subway, laundromat, warehouse, donkeyTower]
-            : dungeon === 'ConstructionDonkeyTower' ? [donkeyTower, hub, asteroids, court, rooftop, videoStore, subway, laundromat, warehouse]
+            : dungeon === 'ConstructionDonkeyTower' ? [donkeyTower, hub, asteroids, court, rooftop, videoStore, subway, laundromat, warehouse, kita]
             : dungeon === 'WarehouseBlockworks' ? [warehouse, hub, asteroids, court, rooftop, videoStore, subway, laundromat, donkeyTower, kita]
             : dungeon === 'LaundromatLabyrinth' ? [laundromat, hub, asteroids, court, rooftop, videoStore, subway, warehouse, donkeyTower, kita]
             : dungeon === 'SubwayTiming' ? [subway, hub, asteroids, court, rooftop, videoStore, laundromat, warehouse, donkeyTower, kita]
