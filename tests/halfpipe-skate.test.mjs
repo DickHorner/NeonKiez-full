@@ -83,13 +83,19 @@ test('Kiez Jam is a timed score attack and only its target clears the dungeon', 
     assert.equal(tickAttempt(attempt, 1000), false);
     assert.equal(attempt.remainingMs, JAM_DURATION_MS - 1000);
 
+    recordLanding(attempt, 'right', true, 'grab');
+    recordLanding(attempt, 'left', true, 'spin-left');
+    assert.equal(attempt.phase, 'playing');
+    assert.equal(attempt.landedTricks.length, 2);
+
     let side = 'right';
-    while (attempt.phase === 'playing') {
-        recordLanding(attempt, side, true, 'spin-left');
+    while (attempt.score < JAM_TARGET_SCORE) {
+        recordLanding(attempt, side, true, 'spin-right');
         side = side === 'right' ? 'left' : 'right';
     }
 
     assert.ok(attempt.score >= JAM_TARGET_SCORE);
+    assert.deepEqual(attempt.landedTricks.sort(), ['grab', 'spin-left', 'spin-right'].sort());
     assert.equal(attempt.phase, 'cleared');
     assert.equal(advanceStage(attempt), false);
 });
