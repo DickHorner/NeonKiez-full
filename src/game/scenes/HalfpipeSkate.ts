@@ -223,6 +223,7 @@ export class HalfpipeSkate extends Scene {
             + Math.max(0, this.launchSpeed - TUNING.launchThreshold) * TUNING.airVelocityGain;
         this.currentTrick = null;
         this.spinRemaining = 0;
+        this.skater.setRotation(0);
         this.pipePosition = side === 'left' ? -1 : 1;
     }
 
