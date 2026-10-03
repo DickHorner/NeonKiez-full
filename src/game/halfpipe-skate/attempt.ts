@@ -60,7 +60,7 @@ function maybeClearStage(attempt: Attempt) {
             ? attempt.cleanLandings >= 3
             : attempt.stage === 2
                 ? attempt.landedTricks.length >= 3
-                : attempt.score >= JAM_TARGET_SCORE;
+                : attempt.score >= JAM_TARGET_SCORE && attempt.landedTricks.length >= 3;
 
     if (!clear) return;
     attempt.phase = attempt.stage === STAGES.length - 1 ? 'cleared' : 'stage-cleared';
@@ -85,11 +85,12 @@ export function recordLanding(
 
     if (trick) {
         attempt.score += TRICK_POINTS[trick] * attempt.combo;
-        if (attempt.stage === 2
-            && side !== attempt.lastTrickSide
-            && !attempt.landedTricks.includes(trick)) {
+        const newTrick = !attempt.landedTricks.includes(trick);
+        if (attempt.stage === 2 && side !== attempt.lastTrickSide && newTrick) {
             attempt.landedTricks.push(trick);
             attempt.lastTrickSide = side;
+        } else if (attempt.stage === 3 && newTrick) {
+            attempt.landedTricks.push(trick);
         }
     }
 
