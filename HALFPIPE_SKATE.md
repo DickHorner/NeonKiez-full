@@ -19,7 +19,7 @@ The dungeon remains strictly halfpipe across four stages:
 1. `PUMP`: build enough speed to leave the pipe and land one clean air.
 2. `AIR`: land three clean aerials.
 3. `TRICKS`: land all three prototype trick types on alternating sides.
-4. `KIEZ JAM`: reach the score target before the short timer expires.
+4. `KIEZ JAM`: land all three trick variations and reach the score target before the short timer expires.
 
 There are no enemies and no combat. Wipeouts are harmless, comic and immediately reset the skater in the same stage.
 
