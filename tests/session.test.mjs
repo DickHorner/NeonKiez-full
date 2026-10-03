@@ -106,3 +106,14 @@ test('Kita-Kiez clear is independent and stores the stable ID once', () => {
     assert.deepEqual(session.clearedDungeonIds, ['KitaKiez']);
     assert.deepEqual(JSON.parse(JSON.stringify(session)), session);
 });
+
+
+test('Halfpipe Skate clear is independent and stores the stable ID once', () => {
+    const session = createSession();
+    assert.equal(isDungeonCleared(session, 'HalfpipeSkate'), false);
+    markDungeonCleared(session, 'HalfpipeSkate');
+    markDungeonCleared(session, 'HalfpipeSkate');
+    assert.equal(isDungeonCleared(session, 'KitaKiez'), false);
+    assert.deepEqual(session.clearedDungeonIds, ['HalfpipeSkate']);
+    assert.deepEqual(JSON.parse(JSON.stringify(session)), session);
+});
