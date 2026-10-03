@@ -334,7 +334,7 @@ export class HalfpipeSkate extends Scene {
         const jam = this.attempt.stage === 3
             ? ` · TIME ${Math.ceil(this.attempt.remainingMs / 1000)}s / TARGET ${JAM_TARGET_SCORE}`
             : '';
-        const tricks = this.attempt.stage === 2
+        const tricks = this.attempt.stage >= 2
             ? ` · TRICKS ${this.attempt.landedTricks.length}/3`
             : '';
 
@@ -374,6 +374,11 @@ export class HalfpipeSkate extends Scene {
         if (this.attempt.phase !== 'playing') return;
 
         if (this.wipeoutUntil > 0) {
+            tickAttempt(this.attempt, delta);
+            if (this.attempt.phase !== 'playing') {
+                this.updateStatus();
+                return;
+            }
             if (this.time.now >= this.wipeoutUntil) {
                 this.resetAfterWipeout();
                 this.updateStatus();
