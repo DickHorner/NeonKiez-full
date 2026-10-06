@@ -9,6 +9,7 @@ import { LaundromatLabyrinth } from './scenes/LaundromatLabyrinth';
 import { WarehouseBlockworks } from './scenes/WarehouseBlockworks';
 import { ConstructionDonkeyTower } from './scenes/ConstructionDonkeyTower';
 import { KitaKiez } from './scenes/KitaKiez';
+import { HalfpipeSkate } from './scenes/HalfpipeSkate';
 import { createSession } from './session';
 
 const config: Types.Core.GameConfig = {
@@ -49,21 +50,23 @@ const StartGame = (parent: string) => {
     const warehouse = new WarehouseBlockworks(session);
     const donkeyTower = new ConstructionDonkeyTower(session);
     const kita = new KitaKiez(session);
+    const halfpipe = new HalfpipeSkate(session);
     // Standalone entry while the LDtk hub artwork is being authored.
     const dungeon = new URLSearchParams(window.location.search).get('dungeon');
     return new Game({
         ...config,
         parent,
-        scene: dungeon === 'KitaKiez' ? [kita, hub, asteroids, court, rooftop, videoStore, subway, laundromat, warehouse, donkeyTower]
-            : dungeon === 'ConstructionDonkeyTower' ? [donkeyTower, hub, asteroids, court, rooftop, videoStore, subway, laundromat, warehouse, kita]
-            : dungeon === 'WarehouseBlockworks' ? [warehouse, hub, asteroids, court, rooftop, videoStore, subway, laundromat, donkeyTower, kita]
-            : dungeon === 'LaundromatLabyrinth' ? [laundromat, hub, asteroids, court, rooftop, videoStore, subway, warehouse, donkeyTower, kita]
-            : dungeon === 'SubwayTiming' ? [subway, hub, asteroids, court, rooftop, videoStore, laundromat, warehouse, donkeyTower, kita]
-            : dungeon === 'VideoStorePlatform' ? [videoStore, hub, asteroids, court, rooftop, subway, laundromat, warehouse, donkeyTower, kita]
-            : dungeon === 'RooftopInvaders' ? [rooftop, hub, asteroids, court, videoStore, subway, laundromat, warehouse, donkeyTower, kita]
-            : dungeon === 'SchoolPongCourt' ? [court, hub, asteroids, rooftop, videoStore, subway, laundromat, warehouse, donkeyTower, kita]
-            : dungeon === 'Asteroids' ? [asteroids, hub, court, rooftop, videoStore, subway, laundromat, warehouse, donkeyTower, kita]
-            : [hub, asteroids, court, rooftop, videoStore, subway, laundromat, warehouse, donkeyTower, kita]
+        scene: dungeon === 'HalfpipeSkate' ? [halfpipe, hub, asteroids, court, rooftop, videoStore, subway, laundromat, warehouse, donkeyTower, kita]
+            : dungeon === 'KitaKiez' ? [kita, hub, asteroids, court, rooftop, videoStore, subway, laundromat, warehouse, donkeyTower, halfpipe]
+            : dungeon === 'ConstructionDonkeyTower' ? [donkeyTower, hub, asteroids, court, rooftop, videoStore, subway, laundromat, warehouse, kita, halfpipe]
+            : dungeon === 'WarehouseBlockworks' ? [warehouse, hub, asteroids, court, rooftop, videoStore, subway, laundromat, donkeyTower, kita, halfpipe]
+            : dungeon === 'LaundromatLabyrinth' ? [laundromat, hub, asteroids, court, rooftop, videoStore, subway, warehouse, donkeyTower, kita, halfpipe]
+            : dungeon === 'SubwayTiming' ? [subway, hub, asteroids, court, rooftop, videoStore, laundromat, warehouse, donkeyTower, kita, halfpipe]
+            : dungeon === 'VideoStorePlatform' ? [videoStore, hub, asteroids, court, rooftop, subway, laundromat, warehouse, donkeyTower, kita, halfpipe]
+            : dungeon === 'RooftopInvaders' ? [rooftop, hub, asteroids, court, videoStore, subway, laundromat, warehouse, donkeyTower, kita, halfpipe]
+            : dungeon === 'SchoolPongCourt' ? [court, hub, asteroids, rooftop, videoStore, subway, laundromat, warehouse, donkeyTower, kita, halfpipe]
+            : dungeon === 'Asteroids' ? [asteroids, hub, court, rooftop, videoStore, subway, laundromat, warehouse, donkeyTower, kita, halfpipe]
+            : [hub, asteroids, court, rooftop, videoStore, subway, laundromat, warehouse, donkeyTower, kita, halfpipe]
     });
 };
 
